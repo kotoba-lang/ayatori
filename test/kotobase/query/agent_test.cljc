@@ -101,6 +101,56 @@
     (is (seq (agent/where-clauses '[:find ?x :where [?e "company/lei" ?x]])))
     (is (some? (agent/validate '[:find ?x :where [?e "nope/nope" ?x]] schema)))))
 
+
+;; ------------------------------------------- found by mutation, not by hand
+;; The three below came out of `scripts/query-dialect-bench/grammar-agreement.cljs`
+;; in com-junkawasaki/root, which mutates valid queries and compares this
+;; validator's verdict against the engine's. Each is a query the engine refuses
+;; and this validator used to accept, which is the expensive direction: the
+;; inference is already paid for by the time the engine says no.
+
+(deftest literal-in-entity-position-is-refused
+  (testing "engine: Expected number or lookup ref for entity id"
+    (is (= :bad-entity-position
+           (:error (agent/validate '[:find ?t :where ["literal" "company/ticker" ?t]] schema)))))
+  (testing "the same shape arrives from swapping the first two positions"
+    (is (= :bad-entity-position
+           (:error (agent/validate '[:find ?t :where ["company/ticker" ?e ?t]] schema))))))
+
+(deftest malformed-predicate-clauses-are-refused
+  (is (= :malformed-predicate-clause
+         (:error (agent/validate
+                  '[:find ?t :where [?e "company/ticker" ?t] [(>= ?t 1) extra]] schema)))
+      "a predicate clause holds exactly one call form")
+  (is (= :malformed-predicate-clause
+         (:error (agent/validate '[:find ?t :where [?e "company/ticker" ?t] ["literal"]] schema)))
+      "a one-element clause that is not a call is nothing this dialect has"))
+
+(deftest unbound-find-vars-are-refused
+  (testing "engine: Query for unknown vars"
+    (let [r (agent/validate '[:find ?t :where [?e "company/ticker"]] schema)]
+      (is (= :unbound-find-var (:error r)))
+      (is (= ["?t"] (:got r)))))
+  (testing "a var bound only in :in is bound"
+    (is (nil? (agent/validate '[:find ?t :in $ ?t :where [?e "company/ticker" ?t]] schema)))))
+
+(deftest unbound-predicate-vars-are-refused
+  (testing "a predicate can only test what a data pattern bound"
+    (let [r (agent/validate
+             '[:find ?t :where [?e "company/revenue-usd"] [(>= ?r 1e11)]
+                               [?e "company/ticker" ?t]] schema)]
+      ;; the missing value position also loses ?r, so either refusal is honest;
+      ;; what matters is that this does not reach the engine
+      (is (some? r))))
+  (is (= :unbound-predicate-var
+         (:error (agent/validate '[:find ?t :where [?e "company/ticker" ?t] [(>= ?r 1)]] schema)))))
+
+(deftest lookup-refs-and-entity-ids-still-pass
+  (is (nil? (agent/validate '[:find ?t :where [1 "company/ticker" ?t]] schema))
+      "a numeric entity id is legal")
+  (is (nil? (agent/validate '[:find ?t :where [[:company/lei "L1"] "company/ticker" ?t]] schema))
+      "so is a lookup ref"))
+
 ;; ---------------------------------------------------------------- prompt
 
 (deftest prompt-carries-the-schema
