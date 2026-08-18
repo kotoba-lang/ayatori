@@ -10,6 +10,40 @@ prerequisite (ADR-2607172300 in `com-junkawasaki/root`) for four sibling repos
 `org-w3-sparql-protocol`) that each need real queries over kotobase-backed
 data and should not each reimplement this bridge.
 
+## `kotobase.query.agent` — the entry an LLM writes through
+
+`bridge` is how a query reaches the datom plane. `agent` is how a query gets
+written and refused before it gets there.
+
+```clojure
+(require '[kotobase.query.agent :as agent])
+
+(def schema {:datasets ["market-intel"]
+             :attributes [{:attr "company/lei" :doc "LEI, the join key"}
+                          {:attr "company/ticker"}]})
+
+(agent/system-prompt schema)          ;; rules + attribute table + examples
+(agent/user-turn "list every ticker")
+(agent/validate q schema)             ;; nil, or a map to hand back to the model
+(agent/repair-turn refusal)           ;; the turn that closed the gap
+(agent/extract-query model-output)    ;; nil when there was no query
+```
+
+**Pure, and depends on nothing** — not even on `bridge`. The caller owns the
+model call and the execution. That is what lets `run-tests-pure.cljs` gate it
+without the six-repo classpath the rest of the suite needs.
+
+Measured on 2026-08-18 (ADR-2608189300 in `com-junkawasaki/root`), twenty
+questions over two real datasets, graded by executing the generated query:
+**45.5% bare → 88.9% with schema, examples, `validate` and up to two
+`repair-turn`s.** All five bare failures were fabricated attribute names, and
+`validate` caught every one without executing anything.
+
+It refuses **shape, not meaning**: fabricated attributes, keyword attributes,
+and predicates written as data patterns (`[>= ?r 1e11]`, `[?ni < 0]` — both
+came out of that measurement, and both read as semantic errors while being
+syntax). It does not know whether a query answers the question.
+
 ## The problem this solves
 
 `kotobase.store`/`kotobase.local` (the `IStore` seam every kotobase-backed
