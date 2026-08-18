@@ -168,6 +168,20 @@
         t (agent/repair-turn r)]
     (is (re-find #"keyword-attributes" t))))
 
+(deftest engine-form-conversion
+  (testing "the dialect is written as a vector; the engine takes only a map,
+            and answers the vector with #{[]} instead of refusing it"
+    (is (= '{:find [?t] :where [[?e "company/ticker" ?t]]}
+           (agent/->engine-query '[:find ?t :where [?e "company/ticker" ?t]])))
+    (is (= '{:find [?t ?n] :in [$ ?x] :where [[?e "company/ticker" ?t] [(>= ?t 1)]]}
+           (agent/->engine-query
+            '[:find ?t ?n :in $ ?x :where [?e "company/ticker" ?t] [(>= ?t 1)]]))
+        ":in survives, and a predicate clause is not mistaken for a section")
+    (is (= '{:find [(count ?e)] :where [[?e "company/ticker" _]]}
+           (agent/->engine-query '[:find (count ?e) :where [?e "company/ticker" _]])))
+    (is (nil? (agent/->engine-query '{:find [?t]}))
+        "already a map: nil rather than a silently mangled second conversion")))
+
 ;; ---------------------------------------------------------------- extract
 
 (deftest extraction
