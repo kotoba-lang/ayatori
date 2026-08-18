@@ -90,9 +90,16 @@
 
 ;; ---------------------------------------------------------------- validate
 
+(defn- entity-position-ok?
+  "A logic var, the blank, an entity id, or a lookup ref. Not a literal string
+  or keyword: the engine answers those with `Expected number or lookup ref for
+  entity id`."
+  [e]
+  (or (var-sym? e) (integer? e) (vector? e)))
+
 (defn- pattern-refusal
-  "A data pattern is `[e a v]`. Refuse the two ways a predicate arrives
-  disguised as one, then the two ways an attribute arrives wrong."
+  "A data pattern is `[e a v]`. Refuse the ways a predicate arrives disguised as
+  one, the ways an attribute arrives wrong, and a literal in the entity slot."
   [c allowed]
   (let [e (first c)
         a (when (>= (count c) 2) (nth c 1))]
@@ -124,7 +131,15 @@
       ;; attribute position is not something this dialect has a meaning for.
       (and (symbol? a) (not (var-sym? a)))
       {:error :unknown-attributes :got (str a)
-       :hint (str (pr-str a) " は属性でも変数でもない。")})))
+       :hint (str (pr-str a) " は属性でも変数でもない。")}
+
+      ;; `["company/ticker" ?e ?t]` (positions swapped) and `["lit" "a/b" ?v]`
+      ;; both land here. Found by the mutation pass in
+      ;; `scripts/query-dialect-bench/grammar-agreement.cljs`, not by hand.
+      (not (entity-position-ok? e))
+      {:error :bad-entity-position :got (pr-str e)
+       :hint (str "1 番目は entity の変数（?e）か _ で、属性でも文字列でもない。"
+                  "位置が入れ替わっていないか: [?e " (pr-str e) " …]")})))
 
 (defn validate
   "`nil` when the query may run. Otherwise a map the caller can hand straight
@@ -152,8 +167,56 @@
        :hint ":find と :where の間に返す変数か集約が 1 つも無い。例: [:find ?x :where …]"}
 
       :else
-      (first (keep #(when-not (call-form? (first %)) (pattern-refusal % allowed))
-                   (where-clauses q))))))
+      (or
+       ;; `[(>= ?r 1e11) extra]` / `["literal"]` — a clause that is neither a
+       ;; well-formed predicate call nor a data pattern.
+       (first (keep (fn [c]
+                      (cond
+                        (and (call-form? (first c)) (> (count c) 1))
+                        {:error :malformed-predicate-clause :got (pr-str c)
+                         :hint "述語節は [(op …)] の 1 要素。余分な要素を付けない。"}
+
+                        (and (= 1 (count c)) (not (call-form? (first c))))
+                        {:error :malformed-predicate-clause :got (pr-str c)
+                         :hint "1 要素の節は述語呼び出しでなければならない: [(op …)]"}))
+                    (where-clauses q)))
+
+       (first (keep #(when-not (call-form? (first %)) (pattern-refusal % allowed))
+                    (where-clauses q)))
+
+       ;; A `:find` variable that nothing binds. The engine answers
+       ;; `Query for unknown vars: [?t]` and the caller has already paid for
+       ;; the inference by then.
+       (let [vars-in (fn [form] (into #{} (filter var-sym?) (tree-seq coll? seq form)))
+             wanted (disj (vars-in (find-bindings q)) '_)
+             ;; ⚠ `(take-while #(not= :where %) q)` here would include the
+             ;; `:find` section itself, making every find var trivially bound
+             ;; and the check inert. Only `:in` binds from outside `:where`.
+             in-section (let [i (first (keep-indexed (fn [n x] (when (= x :in) n)) q))]
+                          (if (nil? i)
+                            []
+                            (take-while #(not (#{:where :with :keys} %))
+                                        (drop (inc i) q))))
+             bound (into (vars-in (where-clauses q)) (vars-in in-section))
+             ;; A predicate can only test what a data pattern bound. The engine
+             ;; refuses `[(>= ?r 1e11)]` when nothing binds `?r`, and by then
+             ;; the inference is paid for.
+             pattern-bound (into (vars-in (remove #(call-form? (first %)) (where-clauses q)))
+                                 (vars-in in-section))
+             pred-vars (disj (vars-in (filter #(call-form? (first %)) (where-clauses q))) '_)
+             missing (sort (remove bound wanted))
+             pred-missing (sort (remove pattern-bound pred-vars))]
+         (cond
+           (seq missing)
+           {:error :unbound-find-var :got (mapv str missing)
+            :hint (str ":find に在るが :where のどこにも束縛されていない変数: "
+                       (str/join ", " missing))}
+
+           (seq pred-missing)
+           {:error :unbound-predicate-var :got (mapv str pred-missing)
+            :hint (str "述語が使っているが、どのデータパターンも束縛していない変数: "
+                       (str/join ", " pred-missing)
+                       "。[?e \"attr\" " (first pred-missing) "] のような節が要る。")}))))))
 
 ;; ---------------------------------------------------------------- prompt
 
