@@ -12,7 +12,8 @@
 
       npx nbb --classpath src:test run-tests.cljs"
   (:require [cljs.test :as t]
-            [kotobase.query.bridge-test]))
+            [kotobase.query.bridge-test]
+            [kotobase.query.agent-test]))
 
 (defmethod t/report [::t/default :end-run-tests] [m]
   (when-not (t/successful? m)
