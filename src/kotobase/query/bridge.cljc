@@ -472,9 +472,34 @@
   positional, same order as `:in`.
 
   A thin delegation to `arrangement.datalog/q` -- this bridge does not
-  reimplement query evaluation."
-  ([db query visible?] (datalog/q db query visible?))
-  ([db query visible? inputs] (datalog/q db query visible? inputs)))
+  reimplement query evaluation.
+
+  ## The vector form is refused here rather than answered wrongly
+
+  `query` must be the MAP form. The engine takes only that, and handed the
+  vector form (`[:find ?t :where [?e \"a/b\" ?t]]` -- what a Datomic or
+  DataScript caller writes, and what `kotobase.query.agent` helps a model
+  produce) it does not throw: `(:find <vector>)` is nil, so it runs an empty
+  query and returns `#{[]}`. Measured 2026-08-18:
+
+      map     {:find [?t] :where [[?e \"company/ticker\" ?t]]}  => #{[\"AAA\"] [\"BBB\"]}
+      vector  [:find ?t :where [?e \"company/ticker\" ?t]]      => #{[]}
+
+  One empty tuple is not distinguishable from a query that matched nothing,
+  so the caller reads a wrong answer as an answer. Convert with
+  `kotobase.query.agent/->engine-query` and pass the result."
+  ([db query visible?] (q db query visible? nil))
+  ([db query visible? inputs]
+   (when-not (map? query)
+     (throw (ex-info (str "kotobase.query.bridge/q takes the MAP form "
+                          "{:find [...] :where [...]}. The vector form is not "
+                          "rejected by the engine -- it silently returns #{[]}. "
+                          "Convert with kotobase.query.agent/->engine-query.")
+                     {:got (if (vector? query) :vector-form (type query))
+                      :query query})))
+   (if (nil? inputs)
+     (datalog/q db query visible?)
+     (datalog/q db query visible? inputs))))
 
 (defn query
   "Convenience: `(q (materialize store coll-keys) query visible? inputs)` in

@@ -29,6 +29,27 @@ written and refused before it gets there.
 (agent/extract-query model-output)    ;; nil when there was no query
 ```
 
+### The dialect is written as a vector; this engine takes only a map
+
+```clojure
+(agent/->engine-query '[:find ?t :where [?e "company/ticker" ?t]])
+;; => {:find [?t] :where [[?e "company/ticker" ?t]]}
+```
+
+Measured 2026-08-18, and the reason both that function and a guard in `bridge/q`
+exist:
+
+```
+map     {:find [?t] :where [[?e "company/ticker" ?t]]}  =>  #{["AAA"] ["BBB"]}
+vector  [:find ?t :where [?e "company/ticker" ?t]]      =>  #{[]}
+```
+
+The vector form — what the dialect is written in, what the prompt teaches, what
+`validate` approves — is **not refused** by `arrangement.datalog`. `(:find
+<vector>)` is nil, so it runs an empty query and answers with one empty tuple,
+which no caller can tell from a query that matched nothing. `bridge/q` now
+throws on a non-map query instead of passing it through.
+
 **Pure, and depends on nothing** — not even on `bridge`. The caller owns the
 model call and the execution. That is what lets `run-tests-pure.cljs` gate it
 without the six-repo classpath the rest of the suite needs.

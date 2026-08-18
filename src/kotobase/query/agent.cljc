@@ -218,6 +218,41 @@
                        (str/join ", " pred-missing)
                        "。[?e \"attr\" " (first pred-missing) "] のような節が要る。")}))))))
 
+
+;; ---------------------------------------------------------------- engine form
+;; ⚠ **書かれる形と、エンジンが受ける形は同じではない。**
+;;
+;; この方言の表記は `[:find ?t :where [?e "a/b" ?t]]`（Datomic/DataScript の
+;; ベクタ形）で、prompt も validator もそれを扱う。ところが kotobase が実際に通す
+;; `datalog.core/q`（= `arrangement.datalog/q`、`bridge/q` の委譲先）が受けるのは
+;; **map 形** `{:find [...] :where [...]}` だけである。
+;;
+;; そしてベクタ形を渡しても **throw しない**。実測 2026-08-18:
+;;
+;;     map    {:find [?t] :where [[?e "company/ticker" ?t]]}  -> #{["AAA"] ["BBB"]}
+;;     vector [:find ?t :where [?e "company/ticker" ?t]]      -> #{[]}
+;;
+;; `(:find <vector>)` が nil になるので、空のクエリが 1 件の空タプルを返す。
+;; **答えられなかったものが、答えと見分けのつかない値で返る** —— この入口が
+;; 存在する理由そのものの形が、production 側の engine 呼び出しに在った。
+;;
+;; だから変換はここが持ち、`bridge/q` は map でないものを**拒否する**（黙って
+;; `#{[]}` を返させない）。
+
+(defn ->engine-query
+  "検証済みのベクタ形を `datalog.core/q` の map 形にする。
+   `[:find … :in … :where …]` の節を、そのまま同名のキーへ移すだけ。"
+  [q]
+  (when (vector? q)
+    (let [section? #{:find :in :where :with :keys :rules}
+          [_ & body] q]
+      (loop [acc {} k nil xs body]
+        (cond
+          (empty? xs) acc
+          (section? (first xs)) (recur acc (first xs) (rest xs))
+          (nil? k) (recur (update acc :find (fnil conj []) (first xs)) nil (rest xs))
+          :else (recur (update acc k (fnil conj []) (first xs)) k (rest xs)))))))
+
 ;; ---------------------------------------------------------------- prompt
 
 (defn schema-block [schema]
