@@ -237,7 +237,7 @@ empty set under a key answers *"this exists, but you may see none of it"* —
 more than the caller is allowed to know.
 
 **`refs-to` returns `{}` on a typical materialized db, and that is a
-property of the data, not a stub.** `:ocp` covers only objects satisfying
+property of the data, not a stub.** `:vaet` covers only objects satisfying
 `materialize`'s `ref?` (`ipld.core/link?`), and documents carry plain EDN.
 A foreign key here is a *value* (`:dept-key "d1"`), so the reverse lookup
 you want is `(bridge/by-predicate-value db :dept-key "d1" visible?)`.

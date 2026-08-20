@@ -29,7 +29,7 @@
   (let [db (bridge/materialize (fixture-store) ["users" "departments"])]
     (is (= #{:users/u1 :users/u2 :users/u3 :users/u4
              :departments/d1 :departments/d2}
-           (into #{} (keys (:spo db))))
+           (into #{} (keys (:eavt db))))
         "one entity, keyword `coll/key`, per materialized doc")))
 
 (deftest materialize-maps-doc-attrs-and-synthetic-attrs
@@ -52,8 +52,8 @@
 
 (deftest materialize-combines-multiple-collections-into-one-db
   (let [db (bridge/materialize (fixture-store) ["users" "departments"])]
-    (is (contains? (:spo db) :users/u1))
-    (is (contains? (:spo db) :departments/d1))))
+    (is (contains? (:eavt db) :users/u1))
+    (is (contains? (:eavt db) :departments/d1))))
 
 ;; -------------------------------------------------------------------- q / query
 
@@ -160,7 +160,7 @@
             the keyword shape and drift from materialize"
     (let [db (bridge/materialize (fixture-store) ["users"])]
       (is (= :users/u1 (bridge/entity-id "users" "u1")))
-      (is (contains? (:spo db) (bridge/entity-id "users" "u1"))))))
+      (is (contains? (:eavt db) (bridge/entity-id "users" "u1"))))))
 
 (deftest access-paths-see-everything-under-a-permissive-predicate
   (let [db (bridge/materialize (fixture-store) ["users" "departments"])]
@@ -185,13 +185,13 @@
              (bridge/by-predicate-value db :dept-key "d1" everything))))))
 
 (deftest refs-to-is-empty-because-documents-hold-values-not-links
-  (testing "not a bug and not a stub: :ocp covers only objects satisfying
+  (testing "not a bug and not a stub: :vaet covers only objects satisfying
             materialize's ref? (ipld.core/link?), and a document's foreign key
             is a plain value. Asserted so the docstring cannot quietly stop
             being true"
     (let [db (bridge/materialize (fixture-store) ["users" "departments"])]
       (is (= {} (bridge/refs-to db "d1" everything)))
-      (is (= {} (:ocp db))))))
+      (is (= {} (:vaet db))))))
 
 (deftest access-paths-apply-visible
   (let [db (bridge/materialize (fixture-store) ["users"])
@@ -218,7 +218,7 @@
             default to fall back on, on any of the four.
 
             `refs-to` is why this is an explicit check rather than a reliance
-            on the predicate being called: `:ocp` is empty, so nothing was
+            on the predicate being called: `:vaet` is empty, so nothing was
             ever filtered, and the two-argument call answered `{}` with no
             visibility decision at all. On the JVM the wrong arity is refused
             before the body runs; under nbb/SCI it is not, so the check has to
@@ -236,7 +236,7 @@
 (deftest datoms-is-the-whole-plane-under-visible
   (let [db (bridge/materialize (fixture-store) ["users" "departments"])
         all (bridge/datoms db everything)]
-    (is (= (reduce + (for [[_ pm] (:spo db) [_ os] pm] (count os)))
+    (is (= (reduce + (for [[_ pm] (:eavt db) [_ os] pm] (count os)))
            (count all))
         "every triple in the db, once")
     (is (every? (fn [d] (= #{:s :p :o} (set (keys d)))) all))
@@ -293,8 +293,8 @@
       (st/-put s "users" "u9" {:name "new"})
       (let [b (bridge/materialize-memo m s ["users"] "cid-B")]
         (is (not (identical? a b)))
-        (is (= 4 (count (:spo b))) "the new version sees the write")
-        (is (= 3 (count (:spo a))) "and the old value is still the old snapshot")))))
+        (is (= 4 (count (:eavt b))) "the new version sees the write")
+        (is (= 3 (count (:eavt a))) "and the old value is still the old snapshot")))))
 
 (deftest coll-keys-are-part-of-the-key-and-order-insensitive
   (let [m (bridge/memo) s (seeded 2)]
@@ -354,7 +354,7 @@
   (let [s (local/local-store)]
     (st/-put s "c" "k" {"text" "hello" "v2" 1})
     (let [db (bridge/materialize s ["c"])
-          attrs (into #{} (for [[_ pm] (:spo db) [p _] pm] p))]
+          attrs (into #{} (for [[_ pm] (:eavt db) [p _] pm] p))]
       (is (contains? attrs :text))
       (is (contains? attrs :v2))
       (is (every? keyword? attrs)
@@ -364,8 +364,8 @@
   (let [a (local/local-store) b (local/local-store)]
     (st/-put a "c" "k" {"name" "Alice" "role" "admin"})
     (st/-put b "c" "k" {:name "Alice" :role "admin"})
-    (is (= (:spo (bridge/materialize a ["c"]))
-           (:spo (bridge/materialize b ["c"]))))))
+    (is (= (:eavt (bridge/materialize a ["c"]))
+           (:eavt (bridge/materialize b ["c"]))))))
 
 (deftest a-string-keyed-doc-is-queryable
   (let [s (local/local-store)]
@@ -381,7 +381,7 @@
   ;; it back as a/b, so the split is not a loss.
   (let [s (local/local-store)]
     (st/-put s "c" "k" {"a/b" 1})
-    (let [attrs (into #{} (for [[_ pm] (:spo (bridge/materialize s ["c"])) [p _] pm] p))]
+    (let [attrs (into #{} (for [[_ pm] (:eavt (bridge/materialize s ["c"])) [p _] pm] p))]
       (is (contains? attrs :a/b))
       (is (= "a" (namespace :a/b)))
       (is (= "b" (name :a/b))))))
