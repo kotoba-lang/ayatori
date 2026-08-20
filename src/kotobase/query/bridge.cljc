@@ -139,10 +139,10 @@
 
   ### `refs-to` is empty for most materialized dbs, and that is not a bug
 
-  `:ocp` is populated only for objects satisfying the `ref?` predicate
+  `:vaet` is populated only for objects satisfying the `ref?` predicate
   `materialize` asserts with, which is `arrangement.core`'s default,
   `ipld.core/link?`. Documents materialized here carry plain EDN values, so
-  in practice nothing lands in `:ocp` and `refs-to` returns `{}`. The
+  in practice nothing lands in `:vaet` and `refs-to` returns `{}`. The
   reverse lookup a surface actually wants -- \"who points at this key?\" -- is
   `by-predicate-value`, since a foreign key here is a VALUE (`:dept-key
   \"d1\"`), not an IPLD link. See the worked join example above.
@@ -229,8 +229,8 @@
 (defn materialize
   "Materialize every document in each of `coll-keys` (a seq of
   `kotobase.store` collection identifiers, e.g. `[\"users\" \"departments\"]`)
-  as datoms in one combined `arrangement.core` db (the `{:spo :pso :pos
-  :ocp}` 4-covering index) -- ready to hand to `q`/`arrangement.datalog/q`.
+  as datoms in one combined `arrangement.core` db (the `{:eavt :aevt :avet
+  :vaet}` 4-covering index) -- ready to hand to `q`/`arrangement.datalog/q`.
   Reads `store` via `kotobase.store/-list` + `-get` only (never mutates it).
 
   v0.1 linear scan: every call does a full `-list` + `-get` of every
@@ -369,7 +369,7 @@
 
   Being CALLED is not a reliable way for the predicate to announce it is
   missing: it is only called when the index has something to filter, and
-  `(refs-to db o)` on a db with an empty `:ocp` answered `{}` perfectly
+  `(refs-to db o)` on a db with an empty `:vaet` answered `{}` perfectly
   cheerfully with no predicate at all. An access path that answers when it
   was handed no visibility decision is what ADR-2607050500 forbids, and the
   empty-index case is the worst version of it -- the answer looks fine."
@@ -430,7 +430,7 @@
   Datomic's VAET. `visible?` is REQUIRED (ns docstring).
 
   Returns `{}` on a typical materialized db, and that is a property of the
-  data rather than of this function: `:ocp` covers only objects satisfying
+  data rather than of this function: `:vaet` covers only objects satisfying
   `materialize`'s `ref?` (`ipld.core/link?`), and documents carry plain EDN.
   Use `by-predicate-value`. See the ns docstring."
   [db o visible?]
@@ -441,7 +441,7 @@
 
 (defn datoms
   "Every `{:s :p :o}` in `db`, under `visible?` -- the fully-unbound scan,
-  lazy, in `:spo` order. `visible?` is REQUIRED (ns docstring).
+  lazy, in `:eavt` order. `visible?` is REQUIRED (ns docstring).
 
   This is the access path a surface with its own engine actually starts
   from: it wants the whole plane once, in its own shape, and does its own
@@ -450,7 +450,7 @@
 
   It was missing from the first cut of this contract (ADR-2608039970), and
   the omission was not harmless: the one surface that needed it read
-  `(:spo db)` directly instead -- a raw index read, with nothing on the
+  `(:eavt db)` directly instead -- a raw index read, with nothing on the
   supported path to apply `visible?` for it. That repo re-implemented the
   predicate discipline itself and got it right; the next one would have had
   to know to.
@@ -460,7 +460,7 @@
   [db visible?]
   (check-visible! visible?)
   (filter visible?
-          (for [[s pm] (:spo db) [p os] pm o os] {:s s :p p :o o})))
+          (for [[s pm] (:eavt db) [p os] pm o os] {:s s :p p :o o})))
 
 ;; --------------------------------------------------------------------- query
 
