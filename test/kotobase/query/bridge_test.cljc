@@ -324,7 +324,18 @@
             db is correct for every caller. If this arity ever grows a
             predicate argument, sharing a db across principals stops being safe
             and this namespace has to be reconsidered, not patched"
-    (is (= 2 (apply max (map count (:arglists (meta #'bridge/materialize))))))))
+    ;; This used to assert `max arity = 2`, which made the INVARIANT and the
+    ;; ARGUMENT COUNT the same statement. They are not: the 3-arity added in
+    ;; 2026-08 is `max-datoms`, a ceiling, and a ceiling is the same value for
+    ;; every principal — it cannot make one caller's db wrong for another, which
+    ;; is the only thing this test is protecting. So the arglists are pinned by
+    ;; NAME instead. Any new parameter, including a predicate, still trips it;
+    ;; the difference is that the failure now says which one appeared.
+    (is (= '[[store coll-keys] [store coll-keys max-datoms]]
+           (:arglists (meta #'bridge/materialize))))
+    (is (not-any? #(re-find #"visible|pred|filter|see|auth" (name %))
+                  (mapcat identity (:arglists (meta #'bridge/materialize))))
+        "and nothing shaped like a visibility decision has appeared among them")))
 
 (deftest db-for-needs-both-halves-or-it-builds-fresh
   (testing "a memo with no version has nothing to key on, and a version with no
@@ -385,3 +396,51 @@
       (is (contains? attrs :a/b))
       (is (= "a" (namespace :a/b)))
       (is (= "b" (name :a/b))))))
+
+;; ---------------------------------------------------- the materialize ceiling
+
+(defn- big-store
+  "`n` documents of three attributes each -- so roughly 5n datoms once
+  `:kotobase/coll` and `:kotobase/key` are added."
+  [n]
+  (let [s (local/local-store)]
+    (doseq [i (range n)]
+      (st/-put s "wide" (str "k" i) {:a (str "a" i) :b (str "b" i) :c (str "c" i)}))
+    s))
+
+(deftest materialize-refuses-above-its-ceiling
+  (testing "the scan that follows the database instead of the answer is bounded"
+    (let [s (big-store 200)
+          e (try (bridge/materialize s ["wide"] 100) nil
+                 (catch #?(:clj clojure.lang.ExceptionInfo :cljs :default) e e))]
+      (is (some? e) "200 documents is ~1000 datoms and the ceiling was 100")
+      (is (= :materialize-over-budget (:kotobase.query/error (ex-data e))))
+      (is (= "wide" (:collection (ex-data e))) "and it names the collection it stopped in")
+      (is (= 100 (:max-datoms (ex-data e)))))))
+
+(deftest materialize-aborts-the-scan-rather-than-checking-a-finished-db
+  (testing "a check applied afterwards would have paid for the whole scan"
+    (let [reads (atom 0)
+          s (big-store 400)
+          counting (reify st/IStore
+                     (-put [_ c k v] (st/-put s c k v))
+                     (-get [_ c k] (swap! reads inc) (st/-get s c k))
+                     (-list [_ c] (st/-list s c))
+                     (-append [_ st ev] (st/-append s st ev))
+                     (-read [_ st since] (st/-read s st since)))]
+      (try (bridge/materialize counting ["wide"] 100) (catch #?(:clj Exception :cljs :default) _ nil))
+      (is (< @reads 400)
+          (str "stopped early: " @reads " of 400 documents read"))
+      (is (pos? @reads) "and it did start, so this is not measuring a no-op"))))
+
+(deftest under-the-ceiling-nothing-changes
+  (testing "the half a ceiling usually breaks"
+    (let [db (bridge/materialize (fixture-store) ["users" "departments"])]
+      (is (seq (arr/by-predicate db :name)))
+      (is (= (bridge/materialize (fixture-store) ["users" "departments"] 10000)
+             db)
+          "and an explicit ceiling above the data gives the same db as the default"))))
+
+(deftest the-default-ceiling-is-a-number-in-the-source
+  (is (= 200000 bridge/default-max-datoms)
+      "changing it is an edit somebody reviews, not an environment variable"))
