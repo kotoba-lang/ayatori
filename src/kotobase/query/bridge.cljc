@@ -226,6 +226,36 @@
   [coll k]
   (keyword (str coll) (str k)))
 
+(def default-max-datoms
+  "The ceiling on one `materialize`. It is a NUMBER and it is in the source,
+  so raising it is an edit somebody reviews.
+
+  Why there is a ceiling at all: this function reads every document in every
+  named collection, so its cost follows the DATABASE and not the answer.
+  Measured 2026-08-23 (`com-junkawasaki/root`
+  90-docs/kotobase-performance/2026-08-23-bridge-materialize-scaling.edn) --
+  17ms at 500 documents, 461ms at 32,000, while the query itself stayed near
+  1ms across that whole 64x range. Essentially the entire cost of a query on
+  this path is building a database value the answer did not need, and that
+  is measured on the in-memory floor: a deployment also pays the object-store
+  reads underneath.
+
+  200,000 is above every graph this bridge serves today and far below what a
+  Worker isolate can hold. It exists so a graph that outgrows this path fails
+  loudly instead of getting slower until someone notices."
+  200000)
+
+(defn- over-budget! [n cap coll]
+  (throw (ex-info (str "materialize refused: reading " (str coll)
+                       " passed " cap " datoms, the ceiling this bridge will "
+                       "build a database value up to. This path scans every "
+                       "document in every named collection, so its cost "
+                       "follows the database and not the answer -- a graph "
+                       "this size needs an index-backed read path, not a "
+                       "larger ceiling.")
+                  {:kotobase.query/error :materialize-over-budget
+                   :datoms n :max-datoms cap :collection (str coll)})))
+
 (defn materialize
   "Materialize every document in each of `coll-keys` (a seq of
   `kotobase.store` collection identifiers, e.g. `[\"users\" \"departments\"]`)
@@ -234,22 +264,40 @@
   Reads `store` via `kotobase.store/-list` + `-get` only (never mutates it).
 
   v0.1 linear scan: every call does a full `-list` + `-get` of every
-  collection and rebuilds the db from scratch -- see ns docstring."
-  [store coll-keys]
-  (reduce
-   (fn [db coll]
+  collection and rebuilds the db from scratch -- see ns docstring.
+
+  **BOUNDED, and it aborts rather than reports.** The count is carried while
+  the scan runs and `:materialize-over-budget` is thrown the moment it passes
+  `max-datoms` (`default-max-datoms` unless given), so the work actually
+  stops -- a check applied to a finished db would bound the memory the caller
+  holds and nothing else, having already paid for the whole scan. `-list` per
+  collection is still paid in full; bounding that needs a store API that can
+  answer a count, which `kotobase.store/IStore` does not have.
+
+  This is the ceiling talked about as \"banning the full scan\": the scan is
+  what this function IS, so what is banned is doing it unboundedly. A caller
+  that needs a bigger answer than this needs a different read path -- see
+  `kotobase.server.pattern-source` for one that reads the ranges a query
+  names instead of everything."
+  ([store coll-keys] (materialize store coll-keys default-max-datoms))
+  ([store coll-keys max-datoms]
+   (let [seen (volatile! 0)]
      (reduce
-      (fn [db k]
-        (let [entity (entity-id coll k)
-              doc (st/-get store coll k)
-              datoms (into [{:s entity :p :kotobase/coll :o (str coll)}
-                            {:s entity :p :kotobase/key :o (str k)}]
-                           (doc->datoms entity doc))]
-          (reduce arr/assert-quad db datoms)))
-      db
-      (st/-list store coll)))
-   (arr/empty-db)
-   coll-keys))
+      (fn [db coll]
+        (reduce
+         (fn [db k]
+           (let [entity (entity-id coll k)
+                 doc (st/-get store coll k)
+                 datoms (into [{:s entity :p :kotobase/coll :o (str coll)}
+                               {:s entity :p :kotobase/key :o (str k)}]
+                              (doc->datoms entity doc))
+                 n (vswap! seen + (count datoms))]
+             (when (> n max-datoms) (over-budget! n max-datoms coll))
+             (reduce arr/assert-quad db datoms)))
+         db
+         (st/-list store coll)))
+      (arr/empty-db)
+      coll-keys))))
 
 
 ;; ------------------------------------------------------------------- memo
