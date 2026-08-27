@@ -1,7 +1,7 @@
 (ns run-tests
   "The suite under ClojureScript.
 
-  kotobase-query bridges query surfaces onto the datom plane inside the Worker.
+  Ayatori bridges query surfaces onto the datom plane inside the Worker.
 
   This repo had no ClojureScript entry, so the murakumo fleet could only
   gate its JVM half. Counts were measured to match before this was added --
@@ -12,6 +12,7 @@
 
       npx nbb --classpath src:test run-tests.cljs"
   (:require [cljs.test :as t]
+            [ayatori.public-api-test]
             [kotobase.query.bridge-test]
             [kotobase.query.agent-test]
             [kotobase.query.agent-engine-test]))
@@ -22,4 +23,4 @@
 
 ;; A pattern, not a second list of namespaces to run: a runner that repeats
 ;; the list can fall behind the suite and report a subset as a pass.
-(t/run-all-tests #"^kotobase\.query\..*-test$|^kotobase\.query-test$")
+(t/run-all-tests #"^ayatori\..*-test$|^kotobase\.query\..*-test$|^kotobase\.query-test$")

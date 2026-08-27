@@ -1,5 +1,6 @@
 (ns kotobase.query.bridge
-  "The kotobase-query bridge (ADR-2607172300 in `com-junkawasaki/root`) --
+  "Ayatori's compatibility bridge (formerly kotobase-query;
+  ADR-2607172300 in `com-junkawasaki/root`) --
   materializes `kotobase.store/IStore` collections as datoms and runs
   Datomic-shaped `:find`/`:where` Datalog queries over them via
   `arrangement.datalog`.

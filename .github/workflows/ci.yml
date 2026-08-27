@@ -19,35 +19,59 @@ jobs:
         with:
           repository: kotoba-lang/arrangement
           # Same pin as deps.edn — keep the two in lockstep.
-          ref: 9e90426430bb4eb6206112a74465a4f9d62fe0c8
+          ref: a5d68dc83245df2c350a3d2ac863c150c9b565fa
           path: .deps/arrangement
       - uses: actions/checkout@v4
         with:
           repository: kotoba-lang/prolly-tree
           # Same pin as arrangement's own deps.edn (transitive).
-          ref: 2a5ba48a2eb11cc73b549ee75f5c1b71cc223566
+          ref: 644753aec57e12c9588786d46751b1503a5fd6f0
           path: .deps/prolly-tree
       - uses: actions/checkout@v4
         with:
           repository: kotoba-lang/io-ipld
           # Same pin as arrangement's own deps.edn (transitive).
-          ref: e08dc3b2ab705be292e388cd1ad136381544a041
+          ref: f99bf27d58a75bb8cf6ddfd2d57a0aaac9c824ac
           path: .deps/io-ipld
       - uses: actions/checkout@v4
         with:
           repository: kotoba-lang/io-multiformats
           # Same pin as io-ipld's own deps.edn (transitive).
-          ref: eec3ee85c458ea830be94518b9a42f4a8f1aee40
+          ref: b3b157e683a943d4f2e9362d9366cceefff3f656
           path: .deps/io-multiformats
       - uses: actions/checkout@v4
         with:
           repository: kotoba-lang/org-ietf-cbor
           # Same pin as io-ipld's own deps.edn (transitive).
-          ref: de18ad29102f9df150e214d756de4719c3c00d7a
+          ref: 1dacfc40c77573e3f4553093de0e0000f18a7c08
           path: .deps/org-ietf-cbor
+      - uses: actions/checkout@v4
+        with:
+          repository: kotoba-lang/dev-protobuf
+          # Same pin as io-ipld's own deps.edn (transitive).
+          ref: cfd0b29997abbcae918ec5e90fddd621dbfb97b6
+          path: .deps/dev-protobuf
+      - uses: actions/checkout@v4
+        with:
+          repository: kotoba-lang/datom-source
+          # Same pin as arrangement's own deps.edn (transitive).
+          ref: 3a99b1b1fb2d2f8736995076eb1ab5f94f0808b7
+          path: .deps/datom-source
+      - uses: actions/checkout@v4
+        with:
+          repository: kotoba-lang/datalog
+          # Same pin as arrangement's own deps.edn (transitive).
+          ref: a43dc1cf72ce6abd8969e206c3b1efe89bb0500c
+          path: .deps/datalog
+      - uses: actions/checkout@v4
+        with:
+          repository: kotoba-lang/io-ipni-specs
+          # Same pin as deps.edn — provider discovery is a direct dependency.
+          ref: 2c1559e2703bf41076188539c7086255b0d3c540
+          path: .deps/io-ipni-specs
       - uses: actions/setup-node@v4
         with:
           node-version: 22
       - run: npm install --global nbb
       - run: npm install
-      - run: nbb --classpath "src:test:.deps/kotobase/src:.deps/arrangement/src:.deps/prolly-tree/src:.deps/io-ipld/src:.deps/io-multiformats/src:.deps/org-ietf-cbor/src" bin/run_tests.cljs
+      - run: nbb --classpath "src:test:.deps/kotobase/src:.deps/arrangement/src:.deps/prolly-tree/src:.deps/io-ipld/src:.deps/io-multiformats/src:.deps/org-ietf-cbor/src:.deps/dev-protobuf/src:.deps/datom-source/src:.deps/datalog/src:.deps/io-ipni-specs/src" bin/run_tests.cljs
