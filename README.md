@@ -71,10 +71,36 @@ prefixes named by the Datalog clauses. A declared range additionally uses the
 persistent range tree and reports whether the read was actually pruned, plus
 the declared disclosure budget, through `remote/scan-range-report`.
 
-This API is synchronous because the current arrangement cursor is synchronous.
-Network and storage remain injected, so JVM services and synchronous nbb
-adapters can use it now; a Worker-native Promise cursor remains a separate
-follow-up rather than being hidden behind this contract.
+The synchronous API remains available for JVM services. Workers use the
+explicit Promise surface: `open-snapshot-async`, `scan-async`, and
+`scan-range-report-async`. Its discovery, provider GET, snapshot opening,
+blinding, decryption, and prolly-tree descent all remain async; tree children
+are fetched with bounded concurrency instead of a synchronous block-miss
+trampoline that retries from the root. Datalog's join engine is still
+synchronous, so this release exposes the Worker-native persistent cursor but
+does not label it `q-async` or hide Promises behind `remote/q`.
+
+CID verification now preserves the codec declared by the requested CID and
+checks its SHA-256 multihash. Persistent Arrangement snapshots remain
+DAG-CBOR, while the transport/verification seam can also validate real raw or
+DAG-PB provider responses before a higher layer decides how to decode them.
+
+## Public network benchmark
+
+`bin/network_bench.cljs` runs cold end-to-end samples against public
+`cid.contact` discovery and the HTTP providers it actually returns. It also
+places a bounded timeout or corrupt response before the real providers to
+measure failover, and probes a currently advertised-but-unavailable Kotobase
+CID so discovery success cannot be reported as retrieval success.
+
+The 2026-08-27 Apple M4 run is recorded in
+`bench/results/2026-08-27-public-ipni-provider.edn`: 20/20 normal reads of a
+119,776-byte block succeeded at p50 413.0 ms / p95 501.4 ms; timeout-first
+fallback was 10/10 at p50 620.9 ms / p95 765.4 ms; corrupt-first fallback was
+10/10 at p50 402.6 ms / p95 499.4 ms. The live Kotobase advertisement probe
+failed closed 5/5 because its discovered provider returned no verified block.
+These are one-host public-network observations, not production Arrangement
+snapshot or multi-block Datalog latency claims.
 
 ## `ayatori.agent` — the entry an LLM writes through
 

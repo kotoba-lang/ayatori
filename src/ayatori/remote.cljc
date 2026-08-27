@@ -23,6 +23,7 @@
             [ayatori.query :as query]
             [clojure.string :as str]
             [ipld.core :as ipld]
+            [multiformats.core :as mf]
             [multiformats.multiaddr :as multiaddr]))
 
 (defn- message [e]
@@ -38,6 +39,25 @@
     (throw (ex-info "ayatori: expected a parseable CID"
                     {:type :ayatori/invalid-cid :value cid})))
   cid)
+
+(defn- verify-block! [expected-cid bytes]
+  (let [{:keys [codec multihash error]} (mf/cid->parts expected-cid)
+        mh (when multihash (vec multihash))]
+    (when error
+      (throw (ex-info "ayatori: expected a CIDv1 block identity"
+                      {:type :ayatori/invalid-cid :cid expected-cid
+                       :reason error})))
+    (when-not (and (= 0x12 (first mh)) (= 32 (second mh)))
+      (throw (ex-info "ayatori: unsupported CID multihash"
+                      {:type :ayatori/unsupported-multihash
+                       :cid expected-cid :code (first mh)
+                       :length (second mh)})))
+    (let [actual (mf/cidv1 codec (mf/multihash-sha256 bytes))]
+      (when-not (= expected-cid actual)
+        (throw (ex-info "ayatori: block CID mismatch"
+                        {:type :ipld/cid-mismatch
+                         :expected-cid expected-cid :actual-cid actual})))
+      bytes)))
 
 (def ^:private empty-stats
   {:discoveries 0 :fetch-attempts 0 :provider-failures 0
@@ -172,6 +192,60 @@
                          {:type :ayatori/no-gateway-route
                           :peer (:peer provider) :attempts attempts})))))))
 
+#?(:cljs
+   (defn gateway-fetcher-async
+     "Worker-native Promise counterpart to `gateway-fetcher`.
+
+     `http-fn` may be global `fetch` adapted to return a Promise of
+     `{:status :body}`. Provider addresses are attempted in order; malformed,
+     unsupported, rejected, and non-200 routes fall through without hiding a
+     Promise behind the synchronous cursor contract."
+     ([http-fn] (gateway-fetcher-async http-fn {}))
+     ([http-fn opts]
+      (fn fetch-provider [provider cid]
+        (letfn [(attempt [addrs failures]
+                  (if-let [addr (first addrs)]
+                    (let [url-result (try
+                                       {:url (gateway-url addr cid opts)}
+                                       (catch :default e
+                                         {:error (message e)}))
+                          url (:url url-result)]
+                      (cond
+                        (:error url-result)
+                        (attempt (next addrs)
+                                 (conj failures {:addr addr
+                                                 :reason :invalid-multiaddr
+                                                 :detail (:error url-result)}))
+
+                        (nil? url)
+                        (attempt (next addrs)
+                                 (conj failures {:addr addr :reason :unsupported}))
+
+                        :else
+                        (-> (js/Promise.resolve
+                             (http-fn {:method :get :url url
+                                       :headers {"Accept" "application/vnd.ipld.raw"}}))
+                            (.then (fn [response]
+                                     (if (and (= 200 (:status response))
+                                              (some? (:body response)))
+                                       (:body response)
+                                       (attempt (next addrs)
+                                                (conj failures
+                                                      {:addr addr
+                                                       :reason :http-error
+                                                       :status (:status response)})))))
+                            (.catch (fn [e]
+                                      (attempt (next addrs)
+                                               (conj failures
+                                                     {:addr addr
+                                                      :reason :transport-error
+                                                      :detail (message e)})))))))
+                    (js/Promise.reject
+                     (ex-info "ayatori: provider has no successful HTTP gateway"
+                              {:type :ayatori/no-gateway-route
+                               :peer (:peer provider) :attempts failures}))))]
+          (attempt (:addrs provider) []))))))
+
 (defn provider-block-getter
   "Build a synchronous `(fn [cid] -> verified-bytes)` block getter.
 
@@ -221,10 +295,7 @@
                       (swap! stats update :fetch-attempts inc)
                       (if-let [bytes (fetch-fn provider cid)]
                         (try
-                          (if-let [verified
-                                   (ipld/get-verified-block (fn [_] bytes) cid)]
-                            {:verified verified}
-                            {:failure (failure provider :missing nil)})
+                          {:verified (verify-block! cid bytes)}
                           (catch #?(:clj Exception :cljs :default) e
                             {:failure (failure provider
                                                (or (:type (ex-data e)) :verification-failed)
@@ -246,6 +317,66 @@
               (throw (ex-info "ayatori: no provider returned a verified block"
                               {:type :ayatori/all-providers-failed
                                :cid cid :attempts failures})))))))))
+
+#?(:cljs
+   (defn provider-block-getter-async
+     "Worker-native `(fn [cid] -> Promise<verified-bytes>)` getter.
+
+     Discovery and provider retrieval may reject or return Promises. Providers
+     are tried in discovery order; only bytes whose SHA-256 multihash matches
+     the requested CID are memoised. The memo stores resolved verified bytes,
+     never a rejected Promise or an unverified response."
+     [{:keys [discover-fn fetch-fn stats block-memo]}]
+     (let [stats (stats-atom stats)
+           block-memo (or block-memo (atom {}))]
+       (fn get-verified-async [cid]
+         (try
+           (validate-cid! cid)
+           (if-let [cached (get @block-memo cid)]
+             (do (swap! stats update :memo-hits inc)
+                 (js/Promise.resolve cached))
+             (-> (do (swap! stats update :discoveries inc)
+                     (js/Promise.resolve (discover-fn cid)))
+                 (.then (fn [result]
+                          (let [providers (validate-discovery! cid result)]
+                            (letfn [(attempt [remaining failures]
+                                      (if-let [provider (first remaining)]
+                                        (do
+                                          (swap! stats update :fetch-attempts inc)
+                                          (-> (js/Promise.resolve (fetch-fn provider cid))
+                                              (.then (fn [bytes]
+                                                       (if-not bytes
+                                                         (throw (ex-info "missing block" {:type :missing}))
+                                                         (verify-block! cid bytes))))
+                                              (.then (fn [verified]
+                                                       (swap! block-memo assoc cid verified)
+                                                       (swap! stats
+                                                              (fn [s]
+                                                                (-> s
+                                                                    (update :verified-blocks inc)
+                                                                    (update :verified-bytes +
+                                                                            (byte-count verified)))))
+                                                       verified))
+                                              (.catch (fn [e]
+                                                        (swap! stats update :provider-failures inc)
+                                                        (attempt (next remaining)
+                                                                 (conj failures
+                                                                       (failure provider
+                                                                                (or (:type (ex-data e))
+                                                                                    :transport-error)
+                                                                                (message e))))))))
+                                        (js/Promise.reject
+                                         (ex-info "ayatori: no provider returned a verified block"
+                                                  {:type :ayatori/all-providers-failed
+                                                   :cid cid :attempts failures}))))]
+                              (attempt providers [])))))
+                 (.catch (fn [e]
+                           (if (= :ayatori/all-providers-failed (:type (ex-data e)))
+                             (throw e)
+                             (throw (ex-info "ayatori: provider discovery failed"
+                                             {:type :ayatori/discovery-failed
+                                              :cid cid :detail (message e)} e)))))))
+           (catch :default e (js/Promise.reject e)))))))
 
 (defn open-snapshot
   "Open a persistent arrangement snapshot through IPNI-backed block reads.
@@ -292,6 +423,44 @@
      :stats stats
      :block-memo block-memo}))
 
+#?(:cljs
+   (defn open-snapshot-async
+     "Open a Worker-native persistent snapshot without a synchronous network
+     trampoline. Returns a Promise of the same session shape as
+     `open-snapshot`, but `:source` is an arrangement `AsyncCursorSource` and
+     `:get-block` returns Promises.
+
+     Required effects are Promise-capable `:fetch-fn`, `:blind-fn`, and
+     `:decrypt-fn`, plus either Promise-capable `:discover-fn` or `:http-fn`
+     (composed through `ayatori.discovery/find-providers-async`)."
+     [{:keys [snapshot-cid discover-fn http-fn discovery-opts fetch-fn
+              blind-fn decrypt-fn partitions stats block-memo]}]
+     (try
+       (validate-cid! snapshot-cid)
+       (when-not (fn? blind-fn)
+         (throw (ex-info "ayatori: blind-fn is required"
+                         {:type :ayatori/missing-blind-fn})))
+       (when-not (fn? decrypt-fn)
+         (throw (ex-info "ayatori: decrypt-fn is required"
+                         {:type :ayatori/missing-decrypt-fn})))
+       (let [discover-fn (or discover-fn
+                             (when (fn? http-fn)
+                               (fn [cid]
+                                 (discovery/find-providers-async
+                                  http-fn cid (or discovery-opts {})))))
+             stats (stats-atom stats)
+             block-memo (or block-memo (atom {}))
+             get-block (provider-block-getter-async
+                        {:discover-fn discover-fn :fetch-fn fetch-fn
+                         :stats stats :block-memo block-memo})]
+         (-> (arrangement-source/cursor-async get-block snapshot-cid
+                                               blind-fn decrypt-fn partitions)
+             (.then (fn [source]
+                      {:snapshot-cid snapshot-cid :source source
+                       :get-block get-block :stats stats
+                       :block-memo block-memo}))))
+       (catch :default e (js/Promise.reject e)))))
+
 (defn q
   "Run Datalog directly over an opened persistent snapshot.
 
@@ -310,6 +479,23 @@
    (scan-range-report opened attr lo hi {}))
   ([opened attr lo hi opts]
    (arrangement-source/scan-range-report (:source opened) attr lo hi opts)))
+
+#?(:cljs
+   (defn scan-async
+     "Worker-native Promise scan for one `[s p o]` pattern over an opened
+     async snapshot. Datalog's current synchronous join engine is deliberately
+     not called here; Promise propagation remains explicit at this API."
+     [opened pattern]
+     (arrangement-source/scan-async (:source opened) pattern)))
+
+#?(:cljs
+   (defn scan-range-report-async
+     "Worker-native Promise range scan with persisted pruning evidence."
+     ([opened attr lo hi]
+      (scan-range-report-async opened attr lo hi {}))
+     ([opened attr lo hi opts]
+      (arrangement-source/scan-range-report-async
+       (:source opened) attr lo hi opts))))
 
 (defn stats
   "Current verified retrieval counters for `opened`. These are block/byte
