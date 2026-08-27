@@ -105,6 +105,31 @@ discovery is multihash-based, while CID verification preserves the codec.
 These are one-host public-network observations, not production Arrangement
 snapshot or multi-block Datalog latency claims.
 
+### Public persistent Arrangement snapshot
+
+`bin/build_public_snapshot.cljs` deterministically builds the multi-block
+fixture without network effects. `bin/public_arrangement_bench.cljs` then
+opens its published snapshot cold and makes every block cross the full public
+path: cid.contact discovery, the returned Kotobase provider, SHA-256/CID
+verification, and the Worker-native Promise cursor. Kotobase's canonical IPLD
+route is declared as `/ipld/:cid`; it is not silently confused with the legacy
+`/ipfs` namespace.
+
+The Apple M4 run in
+`bench/results/2026-08-27-public-arrangement.json` used 24,000 quads in 324
+blocks (6,577,346 bytes). A declared `score` range returning 10 rows succeeded
+10/10 at p50 866.1 ms / p95 1273.1 ms and verified 7 blocks / 135,577 bytes.
+The four-row rare pattern succeeded 10/10 at p50 536.2 ms / p95 772.9 ms and
+verified 3 blocks / 17,234 bytes. A full 12,000-row score scan succeeded 3/3 at
+p50 2102.8 ms / p95 3996.3 ms and verified 57 blocks / 916,304 bytes. Thus the
+persisted range cut reduced this observed full-score read by 8.1x in blocks
+and 6.8x in bytes.
+
+These are cold, one-host public-network cursor measurements, not a production
+SLA. The async cursor returns the correct rows and pruning report, but the
+Datalog join engine remains synchronous; this evidence therefore does not
+rename pattern scans as Worker-native `q-async`.
+
 ## `ayatori.agent` — the entry an LLM writes through
 
 `bridge` is how a query reaches the datom plane. `agent` is how a query gets
