@@ -24,7 +24,7 @@
  :deps {io.github.kotoba-lang/kotobase
         {:git/sha "bbf57df9dde5c1869182012860129a598382e088"}
         io.github.kotoba-lang/arrangement
-        {:git/sha "50aceaaf895b3e52532963c2d61cfd02a40fe0c8"}
+        {:git/sha "5ff7384329130a6b530acb2a29874811073d2fb5"}
         io.github.kotoba-lang/io-ipld
         {:git/sha "f99bf27d58a75bb8cf6ddfd2d57a0aaac9c824ac"}
         io.github.kotoba-lang/io-multiformats

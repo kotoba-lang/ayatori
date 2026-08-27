@@ -61,7 +61,7 @@ turning any one step into evidence for the next one:
 
 (remote/stats opened)
 ;; {:discoveries ... :fetch-attempts ... :verified-blocks ...
-;;  :verified-bytes ... :memo-hits ...}
+;;  :verified-bytes ... :memo-hits ... :in-flight-hits ...}
 ```
 
 The snapshot and every Prolly-tree block are rehashed before use. A bad or
@@ -81,6 +81,11 @@ surface—joins, safe negation, disjunction, recursive rules, aggregates,
 persisted range cuts, ordering, and limits—across that cursor without
 materializing the snapshot. Promise propagation stays explicit; `remote/q`
 remains synchronous.
+
+Concurrent scans often descend through the same upper tree blocks. The async
+getter therefore shares one in-flight Promise per CID: callers await the same
+verified retrieval, failed flights are removed before retry, and only resolved
+verified bytes enter the memo. `:in-flight-hits` makes that coalescing visible.
 
 CID verification now preserves the codec declared by the requested CID and
 checks its SHA-256 multihash. Persistent Arrangement snapshots remain
@@ -137,6 +142,14 @@ The follow-up live run in
 `kind = common`. It succeeded 10/10 with 10 rows at p50 3356.5 ms / p95
 5004.5 ms, verifying 9 blocks / 181,873 bytes per cold sample with 18 memo
 hits. This is likewise a one-host public-network observation, not an SLA.
+
+The bounded-parallel follow-up in
+`bench/results/2026-08-27-public-q-async-parallel.edn` also succeeded 10/10
+with 10 rows. It kept the read at 9 blocks / 181,873 bytes by coalescing 14
+in-flight CID reads per sample. Across separate cold runs, p50 was 3666.6 ms
+(9.2% slower) and p95 was 4454.4 ms (11.0% faster) than the sequential
+observation. Network variation prevents treating that as a universal speedup;
+the durable result is bounded fan-out without duplicate verified bytes.
 
 ## `ayatori.agent` — the entry an LLM writes through
 
