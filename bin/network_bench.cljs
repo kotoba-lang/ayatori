@@ -2,20 +2,24 @@
   "Live, repeatable evidence for Ayatori's public discovery/retrieval seam.
 
   This deliberately uses public cid.contact and providers it returns. It also
-  injects bounded failures ahead of those real providers, and probes one CID
-  currently advertised by Kotobase whose advertised provider returns 404.
+  injects bounded failures ahead of Kotobase's real provider. The benchmark
+  uses the original raw CID from the publisher corpus: IPNI indexes the
+  multihash, so inventing a DAG-CBOR CID with the same digest is not evidence
+  that the advertised raw block is unavailable.
   Output is JSON so a dated evidence file can record the exact observation."
   (:require [ayatori.discovery :as discovery]
             [ayatori.remote :as remote]))
 
 (def successful-cid
-  ;; Public dag-pb block. cid.contact currently returns several
-  ;; transport-ipfs-gateway-http providers for it.
-  "bafybeigdyrzt5sfp7udm7hu76uh7y26nf3efuylqabf3oclgtqy55fbzdi")
+  ;; The original raw CID corresponding to the first entry in Kotobase's
+  ;; advertisement. cid.contact discovers Kotobase's provider and the
+  ;; advertised kotobase.net gateway serves the bytes.
+  "bafkreia2cc444k5yrw57uhszfrvbri7wee3ljbpb5wfcorykk72kgxhjaq")
 
-(def advertised-unavailable-cid
-  ;; First entry in ipni.kotobase.net's live advertisement observed on
-  ;; 2026-08-27, represented as a dag-cbor CID over the advertised multihash.
+(def codec-alias-cid
+  ;; Same SHA-256 multihash as one advertised raw block, but a DAG-CBOR codec.
+  ;; Discovery is expected to find the multihash; retrieval must still fail
+  ;; closed because this distinct CID is not the object the provider stored.
   "bafyreia2cc444k5yrw57uhszfrvbri7wee3ljbpb5wfcorykk72kgxhjaq")
 
 (defn- now [] (.now js/performance))
@@ -104,7 +108,7 @@
 (defn- main []
   (let [normal-n (js/parseInt (or (aget js/process.env "AYATORI_NORMAL_SAMPLES") "20") 10)
         failure-n (js/parseInt (or (aget js/process.env "AYATORI_FAILURE_SAMPLES") "10") 10)
-        unavailable-n (js/parseInt (or (aget js/process.env "AYATORI_UNAVAILABLE_SAMPLES") "5") 10)
+        alias-n (js/parseInt (or (aget js/process.env "AYATORI_ALIAS_SAMPLES") "5") 10)
         timeout-provider (fake-provider "injected-timeout")
         corrupt-provider (fake-provider "injected-corrupt")
         corrupt-bytes (.encode (js/TextEncoder.) "not the requested block")
@@ -136,20 +140,20 @@
         result-p
         (.then corrupt-p
                (fn [[normal timeout-fallback corrupt-fallback]]
-                 (-> (run-n unavailable-n
-                            #(sample advertised-unavailable-cid discover real-fetch))
+                 (-> (run-n alias-n
+                            #(sample codec-alias-cid discover real-fetch))
                      (.then
-                      (fn [unavailable]
+                      (fn [codec-alias]
                         {:schema "ayatori.network-benchmark/v1"
                          :measured-at (.toISOString (js/Date.))
                          :runtime (.-version js/process)
                          :public-indexer "https://cid.contact/routing/v1"
                          :successful-cid successful-cid
-                         :advertised-unavailable-cid advertised-unavailable-cid
+                         :codec-alias-cid codec-alias-cid
                          :normal (summary normal)
                          :timeout-first-provider (summary timeout-fallback)
                          :corrupt-first-provider (summary corrupt-fallback)
-                         :advertised-but-unavailable (summary unavailable)})))))]
+                         :codec-alias-negative (summary codec-alias)})))))]
     (-> result-p
         (.then #(println (js/JSON.stringify (clj->js %) nil 2)))
         (.catch (fn [e]

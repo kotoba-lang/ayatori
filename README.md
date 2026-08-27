@@ -88,17 +88,20 @@ DAG-PB provider responses before a higher layer decides how to decode them.
 ## Public network benchmark
 
 `bin/network_bench.cljs` runs cold end-to-end samples against public
-`cid.contact` discovery and the HTTP providers it actually returns. It also
-places a bounded timeout or corrupt response before the real providers to
-measure failover, and probes a currently advertised-but-unavailable Kotobase
-CID so discovery success cannot be reported as retrieval success.
+`cid.contact` discovery and Kotobase's advertised HTTP provider. It uses the
+original raw CID from the advertisement corpus: IPNI indexes multihashes, so
+constructing a DAG-CBOR CID with the same digest would discover the same
+provider but name a different object. It also places a bounded timeout or
+corrupt response before the real provider to measure failover, and probes that
+codec-alias case to ensure it fails closed.
 
 The 2026-08-27 Apple M4 run is recorded in
 `bench/results/2026-08-27-public-ipni-provider.edn`: 20/20 normal reads of a
-119,776-byte block succeeded at p50 413.0 ms / p95 501.4 ms; timeout-first
-fallback was 10/10 at p50 620.9 ms / p95 765.4 ms; corrupt-first fallback was
-10/10 at p50 402.6 ms / p95 499.4 ms. The live Kotobase advertisement probe
-failed closed 5/5 because its discovered provider returned no verified block.
+78,054-byte Kotobase block succeeded at p50 538.6 ms / p95 1295.1 ms;
+timeout-first fallback was 10/10 at p50 289.3 ms / p95 790.0 ms;
+corrupt-first fallback was 10/10 at p50 483.2 ms / p95 1205.0 ms. A DAG-CBOR
+CID sharing an advertised raw block's multihash failed closed 5/5, as required:
+discovery is multihash-based, while CID verification preserves the codec.
 These are one-host public-network observations, not production Arrangement
 snapshot or multi-block Datalog latency claims.
 
