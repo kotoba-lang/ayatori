@@ -19,6 +19,7 @@
   incremental variants).  Ayatori reads that IPLD snapshot; it does not copy
   it into a throwaway in-memory database."
   (:require [arrangement.source :as arrangement-source]
+            #?(:cljs [arrangement.datalog :as arrangement-datalog])
             [ayatori.discovery :as discovery]
             [ayatori.query :as query]
             [clojure.string :as str]
@@ -472,6 +473,22 @@
   ([opened query-form visible? inputs]
    (query/q (:source opened) query-form visible? inputs)))
 
+#?(:cljs
+   (defn q-async
+     "Run the full Datalog language over an opened Worker-native persistent
+     snapshot and return a Promise of the result.
+
+     Every triple/range scan awaits the async Arrangement cursor, so joins,
+     negation, rules, aggregates, ordering, and limits remain on the same
+     CID-verified lazy block path as `scan-async`; the snapshot is never
+     hydrated into an in-memory db."
+     ([opened query-form visible?]
+      (arrangement-datalog/q-async
+       (:source opened) query-form visible?))
+     ([opened query-form visible? inputs]
+      (arrangement-datalog/q-async
+       (:source opened) query-form visible? inputs))))
+
 (defn scan-range-report
   "Read one declared value range and report whether persisted range buckets
   actually pruned the read, including their disclosure budget."
@@ -483,8 +500,7 @@
 #?(:cljs
    (defn scan-async
      "Worker-native Promise scan for one `[s p o]` pattern over an opened
-     async snapshot. Datalog's current synchronous join engine is deliberately
-     not called here; Promise propagation remains explicit at this API."
+     async snapshot. Use `q-async` when clauses must bind and join."
      [opened pattern]
      (arrangement-source/scan-async (:source opened) pattern)))
 

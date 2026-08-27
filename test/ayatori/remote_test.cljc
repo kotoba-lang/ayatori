@@ -142,7 +142,9 @@
              blind (fn [x] (js/Promise.resolve (pr-str x)))
              crypto (fn [bytes] (js/Promise.resolve bytes))
              quads [{:s "s1" :p "kind" :o "rare"}
+                    {:s "s1" :p "name" :o "Rare One"}
                     {:s "s2" :p "kind" :o "common"}
+                    {:s "s2" :p "name" :o "Common Two"}
                     {:s "s3" :p "noise" :o "value"}]]
          (-> (arr/commit! put! (reduce arr/assert-quad (arr/empty-db) quads)
                           nil arr/current-schema-version blind crypto)
@@ -153,11 +155,21 @@
                         :fetch-fn (fn [_ cid]
                                     (js/Promise.resolve (get @blocks cid)))
                         :blind-fn blind :decrypt-fn crypto})))
-             (.then #(remote/scan-async % [nil "kind" nil]))
+             (.then (fn [opened]
+                      (-> (remote/scan-async opened [nil "kind" nil])
+                          (.then (fn [got]
+                                   (is (= #{{:s "s1" :p "kind" :o "rare"}
+                                            {:s "s2" :p "kind" :o "common"}}
+                                          got))
+                                   (remote/q-async
+                                    opened
+                                    '{:find [?s ?name]
+                                      :where [[?s "kind" "rare"]
+                                              [?s "name" ?name]]}
+                                    (constantly true)))))))
              (.then (fn [got]
-                      (is (= #{{:s "s1" :p "kind" :o "rare"}
-                               {:s "s2" :p "kind" :o "common"}}
-                             got))
+                      (is (= #{["s1" "Rare One"]} got)
+                          "the Worker-native surface executes a real join")
                       (done)))
              (.catch (fn [e]
                        (is false (str "async open/scan threw: " e))

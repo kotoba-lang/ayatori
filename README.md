@@ -72,13 +72,15 @@ persistent range tree and reports whether the read was actually pruned, plus
 the declared disclosure budget, through `remote/scan-range-report`.
 
 The synchronous API remains available for JVM services. Workers use the
-explicit Promise surface: `open-snapshot-async`, `scan-async`, and
+explicit Promise surface: `open-snapshot-async`, `q-async`, `scan-async`, and
 `scan-range-report-async`. Its discovery, provider GET, snapshot opening,
 blinding, decryption, and prolly-tree descent all remain async; tree children
 are fetched with bounded concurrency instead of a synchronous block-miss
-trampoline that retries from the root. Datalog's join engine is still
-synchronous, so this release exposes the Worker-native persistent cursor but
-does not label it `q-async` or hide Promises behind `remote/q`.
+trampoline that retries from the root. `q-async` carries the full Datalog
+surface—joins, safe negation, disjunction, recursive rules, aggregates,
+persisted range cuts, ordering, and limits—across that cursor without
+materializing the snapshot. Promise propagation stays explicit; `remote/q`
+remains synchronous.
 
 CID verification now preserves the codec declared by the requested CID and
 checks its SHA-256 multihash. Persistent Arrangement snapshots remain
@@ -126,9 +128,15 @@ persisted range cut reduced this observed full-score read by 8.1x in blocks
 and 6.8x in bytes.
 
 These are cold, one-host public-network cursor measurements, not a production
-SLA. The async cursor returns the correct rows and pruning report, but the
-Datalog join engine remains synchronous; this evidence therefore does not
-rename pattern scans as Worker-native `q-async`.
+SLA. They predate the Worker-native Datalog `q-async` landing and therefore
+measure cursor patterns and range pruning, not multi-clause join latency.
+
+The follow-up live run in
+`bench/results/2026-08-27-public-q-async.edn` executes a real four-clause
+`q-async`: persisted `score` range 5010–5020 joined by subject to
+`kind = common`. It succeeded 10/10 with 10 rows at p50 3356.5 ms / p95
+5004.5 ms, verifying 9 blocks / 181,873 bytes per cold sample with 18 memo
+hits. This is likewise a one-host public-network observation, not an SLA.
 
 ## `ayatori.agent` — the entry an LLM writes through
 
