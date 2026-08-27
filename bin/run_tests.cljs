@@ -16,10 +16,12 @@
 (ns run-tests
   (:require [cljs.test :as t]
             [ayatori.public-api-test]
+            [ayatori.remote-test]
             [kotobase.query.bridge-test]))
 
 (defmethod t/report [:cljs.test/default :end-run-tests] [m]
   (when-not (t/successful? m)
     (set! (.-exitCode js/process) 1)))
 
-(t/run-tests 'ayatori.public-api-test 'kotobase.query.bridge-test)
+(t/run-tests 'ayatori.public-api-test 'ayatori.remote-test
+             'kotobase.query.bridge-test)

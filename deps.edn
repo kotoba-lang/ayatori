@@ -13,11 +13,10 @@
  ;; ns docstrings in `src/ayatori/query.cljc` and
  ;; `src/ayatori/discovery.cljc`.
  ;;
- ;; `arrangement`'s own deps.edn pulls in prolly-tree/io-ipld (its
- ;; commit!/CID-snapshot machinery, unused by this bridge but required at
- ;; namespace-load time) which in turn pull in io-multiformats/org-ietf-cbor
- ;; -- tools.deps resolves that whole chain transitively from the two
- ;; direct deps below for the JVM :test alias. The nbb primary test path
+ ;; `ayatori.remote` directly uses io-ipld for verification and
+ ;; io-multiformats for advertised gateway addresses. `arrangement` pulls in
+ ;; prolly-tree/datom-source/datalog; tools.deps resolves the remaining chain
+ ;; from the pinned direct deps below for the JVM :test alias. The nbb primary test path
  ;; has no dependency resolver, so `bin/run_tests.cljs` / CI clone each of
  ;; those transitive deps into their own `.deps/<name>` and list every
  ;; src dir on --classpath by hand -- see the README's Develop/test section
@@ -26,6 +25,10 @@
         {:git/sha "bbf57df9dde5c1869182012860129a598382e088"}
         io.github.kotoba-lang/arrangement
         {:git/sha "a5d68dc83245df2c350a3d2ac863c150c9b565fa"}
+        io.github.kotoba-lang/io-ipld
+        {:git/sha "f99bf27d58a75bb8cf6ddfd2d57a0aaac9c824ac"}
+        io.github.kotoba-lang/io-multiformats
+        {:git/sha "b3b157e683a943d4f2e9362d9366cceefff3f656"}
         io.github.kotoba-lang/io-ipni-specs
         {:git/sha "2c1559e2703bf41076188539c7086255b0d3c540"}}
  ;; First-class runtime is nbb/cljs (repo-wide runtime priority):

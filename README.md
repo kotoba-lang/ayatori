@@ -21,11 +21,60 @@ and neither is proof that a query was evaluated.
 Current implemented surfaces:
 
 - `ayatori.discovery` — injected-transport IPNI/Delegated Routing provider lookup;
+- `ayatori.remote` — verified provider block reads and range-pruned queries over
+  persistent arrangement snapshots;
 - `ayatori.query` — materialization, visibility-carrying access paths, and Datalog;
 - `ayatori.agent` — pure query generation and validation helpers.
 
 `kotobase.query.bridge` and `kotobase.query.agent` remain compatibility
 namespaces. New callers should use `ayatori.*`.
+
+## `ayatori.remote` — IPNI → verified IPLD → persistent query
+
+`ayatori.remote/open-snapshot` connects the distributed read path without
+turning any one step into evidence for the next one:
+
+```clojure
+(require '[ayatori.remote :as remote])
+
+(def opened
+  (remote/open-snapshot
+   {:snapshot-cid arrangement-snapshot-cid
+    ;; Or inject :discover-fn directly. http-fn is the IPNI JSON transport.
+    :http-fn ipni-http
+    ;; Turns advertised HTTPS multiaddrs into trustless-gateway block GETs.
+    ;; A custom (fn [provider cid] -> bytes) may be injected instead.
+    :fetch-fn (remote/gateway-fetcher block-http)
+    :blind-fn blind
+    :decrypt-fn decrypt
+    ;; The same declared range partitions used by arrangement.core/commit!.
+    :partitions [{:attr "score"
+                  :boundaries [25 50 75]
+                  :budget-bits 2}]}))
+
+(remote/q opened
+          '{:find [?entity ?score]
+            :where [[?entity "score" ?score]
+                    [(>= ?score 25)]
+                    [(< ?score 50)]]}
+          visible?)
+
+(remote/stats opened)
+;; {:discoveries ... :fetch-attempts ... :verified-blocks ...
+;;  :verified-bytes ... :memo-hits ...}
+```
+
+The snapshot and every Prolly-tree block are rehashed before use. A bad or
+missing provider is skipped, but unverified bytes are never returned or
+memoised. `arrangement.source/cursor` then reads only the covering-index
+prefixes named by the Datalog clauses. A declared range additionally uses the
+persistent range tree and reports whether the read was actually pruned, plus
+the declared disclosure budget, through `remote/scan-range-report`.
+
+This API is synchronous because the current arrangement cursor is synchronous.
+Network and storage remain injected, so JVM services and synchronous nbb
+adapters can use it now; a Worker-native Promise cursor remains a separate
+follow-up rather than being hidden behind this contract.
 
 ## `ayatori.agent` — the entry an LLM writes through
 
@@ -132,18 +181,22 @@ produce a cache that never invalidates. A revision *counter* is not
 automatically sufficient either — a counter is unique only along one line of
 writes, and a chain can fork.
 
-## ⚠️ v0.1 limitation: linear materialization (read this before depending on it)
+## ⚠️ Legacy `IStore` limitation: linear materialization
 
 `materialize` does a **full `-list` + `-get` scan of every requested
 collection, on every call**, building a throwaway in-memory `arrangement`
-db that is discarded after the query runs. There is:
+db. This is still the compatibility path for flat document stores. There is:
 
 - **no incremental indexing** — every `materialize` call redoes the full scan,
-  even if nothing changed since the last call;
-- **no caching** — nothing is kept warm between calls;
+  unless the caller uses the CID-keyed `materialize-memo`/`db-for` seam;
+- **no answer caching** — the memo retains a CID-keyed snapshot projection,
+  never a principal-specific query result;
 - **no persistence** — `arrangement.core/commit!` (the CID-addressed
   snapshot machinery) is never called by this bridge; materialized data
   lives only in memory for the duration of one `materialize`/`q` call.
+
+`ayatori.remote` does not take this path: it reads an already-persistent
+arrangement snapshot by CID and follows only the required index ranges.
 
 This is an accepted, explicitly-documented v0.1 scope decision
 (ADR-2607172300), not an oversight: fine for the small/test-scale query
@@ -303,13 +356,14 @@ retired") and `arrangement`'s own README / ADR-2607050700 for the merge.
   `kotobase.store`/`kotobase.local` (`IStore`, `LocalStore`), the seam this
   bridge reads from.
 - [`kotoba-lang/arrangement`](https://github.com/kotoba-lang/arrangement) —
-  `arrangement.core` (the 4-covering index this bridge writes into) and
-  `arrangement.datalog` (the query engine this bridge delegates to).
-  `arrangement.core` requires `prolly-tree.core`/`ipld.core` at
-  namespace-load time (its `commit!`/CID-snapshot machinery, unused by
-  this bridge but pulled in transitively) — those in turn require
-  `io-multiformats`/`org-ietf-cbor`. `deps.edn`'s two direct git deps
-  (`kotobase`, `arrangement`) resolve that whole chain automatically for
+  the persistent 4-covering index, prefix/range cursor, and Datalog engine.
+  `ayatori.remote` reads its CID-addressed snapshots directly.
+- [`kotoba-lang/io-ipld`](https://github.com/kotoba-lang/io-ipld) —
+  CID verification for every block returned by a provider. It pulls in
+  `org-ietf-cbor` and `dev-protobuf`.
+- [`kotoba-lang/io-multiformats`](https://github.com/kotoba-lang/io-multiformats) —
+  strict parsing of advertised HTTP-gateway multiaddrs. `deps.edn`'s direct
+  git dependencies resolve the complete chain automatically for
   the JVM `:test` alias via `tools.deps`; the nbb primary test path has no
   dependency resolver, so `bin/run_tests.cljs`/CI clone every transitive
   dep by hand — see Develop/test below.
@@ -347,9 +401,9 @@ nbb --classpath "src:test:.deps/kotobase/src:.deps/arrangement/src:.deps/prolly-
 ```
 
 Each `.deps/<name>` should be checked out at the SHA pinned in `deps.edn`
-(`kotobase`, `arrangement`, `io-ipni-specs`) or in `arrangement`'s own `deps.edn`
-transitively (`prolly-tree`, `io-ipld`, `io-multiformats`,
-`org-ietf-cbor`) — CI pins every one of them, see
+(`kotobase`, `arrangement`, `io-ipld`, `io-multiformats`, `io-ipni-specs`) or in the dependency
+repos' own `deps.edn` transitively (`prolly-tree`, `io-multiformats`,
+`org-ietf-cbor`, `dev-protobuf`, `datom-source`, `datalog`) — CI pins every one of them, see
 `.github/workflows/ci.yml`.
 
 The `:test` alias in `deps.edn` is the JVM **compat** suite only (`clojure
