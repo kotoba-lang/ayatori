@@ -1,22 +1,39 @@
-# kotobase-query
+# ayatori
 
-[![CI](https://github.com/kotoba-lang/kotobase-query/actions/workflows/ci.yml/badge.svg)](https://github.com/kotoba-lang/kotobase-query/actions/workflows/ci.yml)
+[![CI](https://github.com/kotoba-lang/ayatori/actions/workflows/ci.yml/badge.svg)](https://github.com/kotoba-lang/ayatori/actions/workflows/ci.yml)
 
-**The bridge from [`kotobase`](https://github.com/kotoba-lang/kotobase)'s flat document
-store to real cross-record Datalog queries**, via
+**The query plane woven from IPLD graphs and IPNI provider discovery.**
+
+Ayatori bridges [`kotobase`](https://github.com/kotoba-lang/kotobase)'s flat document
+store to real cross-record Datalog queries via
 [`arrangement`](https://github.com/kotoba-lang/arrangement) — built as a shared
 prerequisite (ADR-2607172300 in `com-junkawasaki/root`) for four sibling repos
 (`datomic-client-shim`, `org-postgresql-wire`, `org-opencypher-cypher`,
 `org-w3-sparql-protocol`) that each need real queries over kotobase-backed
 data and should not each reimplement this bridge.
 
-## `kotobase.query.agent` — the entry an LLM writes through
+The name reflects the boundary: IPLD owns immutable values, links, traversal,
+and verification; IPNI tells Ayatori where a CID may be available; Ayatori
+weaves those inputs into a queryable projection. These are separate effects:
+an IPNI provider result is not proof that content was retrieved or CID-verified,
+and neither is proof that a query was evaluated.
+
+Current implemented surfaces:
+
+- `ayatori.discovery` — injected-transport IPNI/Delegated Routing provider lookup;
+- `ayatori.query` — materialization, visibility-carrying access paths, and Datalog;
+- `ayatori.agent` — pure query generation and validation helpers.
+
+`kotobase.query.bridge` and `kotobase.query.agent` remain compatibility
+namespaces. New callers should use `ayatori.*`.
+
+## `ayatori.agent` — the entry an LLM writes through
 
 `bridge` is how a query reaches the datom plane. `agent` is how a query gets
 written and refused before it gets there.
 
 ```clojure
-(require '[kotobase.query.agent :as agent])
+(require '[ayatori.agent :as agent])
 
 (def schema {:datasets ["market-intel"]
              :attributes [{:attr "company/lei" :doc "LEI, the join key"}
@@ -163,7 +180,7 @@ For a document `doc` at `(kotobase.store/-get store coll k)`:
 ```clojure
 (require '[kotobase.local :as local]
          '[kotobase.store :as st]
-         '[kotobase.query.bridge :as bridge])
+         '[ayatori.query :as bridge])
 
 ;; materialize: IStore + collection keys -> one combined arrangement db
 (bridge/materialize store coll-keys)
@@ -296,6 +313,10 @@ retired") and `arrangement`'s own README / ADR-2607050700 for the merge.
   the JVM `:test` alias via `tools.deps`; the nbb primary test path has no
   dependency resolver, so `bin/run_tests.cljs`/CI clone every transitive
   dep by hand — see Develop/test below.
+- [`kotoba-lang/io-ipni-specs`](https://github.com/kotoba-lang/io-ipni-specs) —
+  provider discovery through Delegated Routing V1 and IPNI-native `/cid`.
+  Transport and JSON parsing are caller-injected; discovery never rewrites
+  the content CID and does not imply successful IPLD retrieval.
 - npm `@noble/hashes` — transitive JS-runtime dep of `io-multiformats`
   (`multiformats.core` requires `@noble/hashes/sha2.js` under `:cljs`; the
   JVM `:test` alias uses `java.security.MessageDigest` instead and needs
@@ -317,12 +338,16 @@ git clone https://github.com/kotoba-lang/prolly-tree .deps/prolly-tree
 git clone https://github.com/kotoba-lang/io-ipld .deps/io-ipld
 git clone https://github.com/kotoba-lang/io-multiformats .deps/io-multiformats
 git clone https://github.com/kotoba-lang/org-ietf-cbor .deps/org-ietf-cbor
+git clone https://github.com/kotoba-lang/dev-protobuf .deps/dev-protobuf
+git clone https://github.com/kotoba-lang/datom-source .deps/datom-source
+git clone https://github.com/kotoba-lang/datalog .deps/datalog
+git clone https://github.com/kotoba-lang/io-ipni-specs .deps/io-ipni-specs
 npm install
-nbb --classpath "src:test:.deps/kotobase/src:.deps/arrangement/src:.deps/prolly-tree/src:.deps/io-ipld/src:.deps/io-multiformats/src:.deps/org-ietf-cbor/src" bin/run_tests.cljs
+nbb --classpath "src:test:.deps/kotobase/src:.deps/arrangement/src:.deps/prolly-tree/src:.deps/io-ipld/src:.deps/io-multiformats/src:.deps/org-ietf-cbor/src:.deps/dev-protobuf/src:.deps/datom-source/src:.deps/datalog/src:.deps/io-ipni-specs/src" bin/run_tests.cljs
 ```
 
 Each `.deps/<name>` should be checked out at the SHA pinned in `deps.edn`
-(`kotobase`, `arrangement`) or in `arrangement`'s own `deps.edn`
+(`kotobase`, `arrangement`, `io-ipni-specs`) or in `arrangement`'s own `deps.edn`
 transitively (`prolly-tree`, `io-ipld`, `io-multiformats`,
 `org-ietf-cbor`) — CI pins every one of them, see
 `.github/workflows/ci.yml`.

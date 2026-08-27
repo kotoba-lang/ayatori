@@ -1,7 +1,7 @@
 ;; nbb test runner — first-class runtime per repo rule (kotoba wasm >
 ;; clojurewasm > cljs > nbb > (jvm/bb)). Run from the repo root:
 ;;
-;;   nbb --classpath "src:test:.deps/kotobase/src:.deps/arrangement/src:.deps/prolly-tree/src:.deps/io-ipld/src:.deps/io-multiformats/src:.deps/org-ietf-cbor/src" bin/run_tests.cljs
+;;   nbb --classpath "src:test:.deps/kotobase/src:.deps/arrangement/src:.deps/prolly-tree/src:.deps/io-ipld/src:.deps/io-multiformats/src:.deps/org-ietf-cbor/src:.deps/dev-protobuf/src:.deps/datom-source/src:.deps/datalog/src:.deps/io-ipni-specs/src" bin/run_tests.cljs
 ;;
 ;; where every .deps/<name> is a checkout of the matching kotoba-lang repo
 ;; at the SHA pinned in deps.edn (kotobase, arrangement) or in
@@ -15,10 +15,11 @@
 ;; this repo's package.json before running (see README).
 (ns run-tests
   (:require [cljs.test :as t]
+            [ayatori.public-api-test]
             [kotobase.query.bridge-test]))
 
 (defmethod t/report [:cljs.test/default :end-run-tests] [m]
   (when-not (t/successful? m)
     (set! (.-exitCode js/process) 1)))
 
-(t/run-tests 'kotobase.query.bridge-test)
+(t/run-tests 'ayatori.public-api-test 'kotobase.query.bridge-test)
