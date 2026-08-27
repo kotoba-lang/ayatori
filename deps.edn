@@ -24,11 +24,11 @@
  :deps {io.github.kotoba-lang/kotobase
         {:git/sha "bbf57df9dde5c1869182012860129a598382e088"}
         io.github.kotoba-lang/arrangement
-        {:git/sha "a5d68dc83245df2c350a3d2ac863c150c9b565fa"}
+        {:git/sha "32ea3eb5a4b58af940df53d7754769fbffe1e559"}
         io.github.kotoba-lang/io-ipld
         {:git/sha "f99bf27d58a75bb8cf6ddfd2d57a0aaac9c824ac"}
         io.github.kotoba-lang/io-multiformats
-        {:git/sha "b3b157e683a943d4f2e9362d9366cceefff3f656"}
+        {:git/sha "c5963264a8da78ece878b04da18225abdbb84457"}
         io.github.kotoba-lang/io-ipni-specs
         {:git/sha "2c1559e2703bf41076188539c7086255b0d3c540"}}
  ;; First-class runtime is nbb/cljs (repo-wide runtime priority):
