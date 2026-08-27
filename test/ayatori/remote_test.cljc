@@ -133,6 +133,59 @@
                        (done))))))))
 
 #?(:cljs
+   (deftest concurrent-async-reads-share-one-verified-flight
+     (async done
+       (let [wanted (.encode (js/TextEncoder.) "shared")
+             cid (mf/cidv1 0x70 (mf/multihash-sha256 wanted))
+             discoveries (atom 0)
+             fetches (atom 0)
+             stats (atom {})
+             getter (remote/provider-block-getter-async
+                     {:discover-fn (fn [asked]
+                                     (swap! discoveries inc)
+                                     (js/Promise.resolve (providers asked ["p1"])))
+                      :fetch-fn (fn [_ _]
+                                  (swap! fetches inc)
+                                  (js/Promise.
+                                   (fn [resolve _]
+                                     (js/setTimeout #(resolve wanted) 5))))
+                      :stats stats})]
+         (-> (js/Promise.all (into-array [(getter cid) (getter cid) (getter cid)]))
+             (.then (fn [results]
+                      (is (every? #(= (vec wanted) (vec %)) (js->clj results)))
+                      (is (= 1 @discoveries))
+                      (is (= 1 @fetches))
+                      (is (= 1 (:verified-blocks @stats)))
+                      (is (= 2 (:in-flight-hits @stats)))
+                      (done)))
+             (.catch (fn [e]
+                       (is false (str "shared flight threw: " e))
+                       (done))))))))
+
+#?(:cljs
+   (deftest failed-flight-is-cleared-before-retry
+     (async done
+       (let [wanted (.encode (js/TextEncoder.) "retry")
+             cid (mf/cidv1 0x70 (mf/multihash-sha256 wanted))
+             attempts (atom 0)
+             getter (remote/provider-block-getter-async
+                     {:discover-fn #(js/Promise.resolve (providers % ["p1"]))
+                      :fetch-fn (fn [_ _]
+                                  (if (= 1 (swap! attempts inc))
+                                    (js/Promise.reject (js/Error. "temporary"))
+                                    (js/Promise.resolve wanted)))})]
+         (-> (getter cid)
+             (.then (fn [_] (is false "the first flight must reject")))
+             (.catch (fn [_] (getter cid)))
+             (.then (fn [bytes]
+                      (is (= (vec wanted) (vec bytes)))
+                      (is (= 2 @attempts))
+                      (done)))
+             (.catch (fn [e]
+                       (is false (str "retry threw: " e))
+                       (done))))))))
+
+#?(:cljs
    (deftest worker-native-open-and-prefix-scan
      (async done
        (let [blocks (atom {})
