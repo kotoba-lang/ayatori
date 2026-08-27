@@ -104,11 +104,25 @@
                                              (.then (fn [rows] {:rows (count rows)}))))))
                      (.then (fn [rare-samples] [range-samples rare-samples])))))
         (.then (fn [[range-samples rare-samples]]
+                 (-> (run-n n #(sample (fn [opened]
+                                         (-> (remote/q-async
+                                              opened
+                                              '{:find [?s ?score]
+                                                :where [[?s "score" ?score]
+                                                        [(>= ?score 5010)]
+                                                        [(< ?score 5020)]
+                                                        [?s "kind" "common"]]}
+                                              (constantly true))
+                                             (.then (fn [rows]
+                                                      {:rows (count rows)}))))))
+                     (.then (fn [datalog-samples]
+                              [range-samples rare-samples datalog-samples])))))
+        (.then (fn [[range-samples rare-samples datalog-samples]]
                  (-> (run-n full-n #(sample (fn [opened]
                                               (-> (remote/scan-async opened [nil "score" nil])
                                                   (.then (fn [rows] {:rows (count rows)}))))))
                      (.then (fn [full-samples]
-                              {:schema "ayatori.public-arrangement-benchmark/v1"
+                              {:schema "ayatori.public-arrangement-benchmark/v2"
                                :measured-at (.toISOString (js/Date.))
                                :runtime (.-version js/process)
                                :public-indexer "https://cid.contact/routing/v1"
@@ -118,6 +132,7 @@
                                          :blocks 324 :bytes 6577346}
                                :range-5010-5020 (summarize range-samples)
                                :rare-pattern (summarize rare-samples)
+                               :datalog-range-kind-join (summarize datalog-samples)
                                :full-score-pattern (summarize full-samples)})))))
         (.then #(println (js/JSON.stringify (clj->js %) nil 2)))
         (.catch (fn [e]
