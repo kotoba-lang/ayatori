@@ -2,7 +2,5 @@
   "name": "ayatori",
   "private": true,
   "description": "Ayatori query plane for Kotobase -- materialization and query access over content-addressed graph data.",
-  "dependencies": {
-    "@noble/hashes": "^1.4.0"
-  }
+  "dependencies": {}
 }
