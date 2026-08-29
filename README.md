@@ -446,16 +446,6 @@ retired") and `arrangement`'s own README / ADR-2607050700 for the merge.
   provider discovery through Delegated Routing V1 and IPNI-native `/cid`.
   Transport and JSON parsing are caller-injected; discovery never rewrites
   the content CID and does not imply successful IPLD retrieval.
-- npm `@noble/hashes` — transitive JS-runtime dep of `io-multiformats`
-  (`multiformats.core` requires `@noble/hashes/sha2.js` under `:cljs`; the
-  JVM `:test` alias uses `java.security.MessageDigest` instead and needs
-  no npm package). `io-multiformats`'s own `package.json` also lists a
-  `"hashes": "2.0.1"` dependency, but nothing in its source actually
-  requires the npm `hashes` package and no matching registry version
-  exists (`npm install` 404s on it) — that entry is vestigial/broken
-  upstream and deliberately **not** mirrored in this repo's
-  `package.json`.
-
 ## Develop / test
 
 First-class runtime is **nbb/cljs** (repo-wide runtime priority):
@@ -471,7 +461,6 @@ git clone https://github.com/kotoba-lang/dev-protobuf .deps/dev-protobuf
 git clone https://github.com/kotoba-lang/datom-source .deps/datom-source
 git clone https://github.com/kotoba-lang/datalog .deps/datalog
 git clone https://github.com/kotoba-lang/io-ipni-specs .deps/io-ipni-specs
-npm install
 nbb --classpath "src:test:.deps/kotobase/src:.deps/arrangement/src:.deps/prolly-tree/src:.deps/io-ipld/src:.deps/io-multiformats/src:.deps/org-ietf-cbor/src:.deps/dev-protobuf/src:.deps/datom-source/src:.deps/datalog/src:.deps/io-ipni-specs/src" bin/run_tests.cljs
 ```
 
