@@ -9,10 +9,6 @@
 ;; io-multiformats, org-ietf-cbor -- see deps.edn's comment for why these
 ;; four are on the classpath even though this bridge never calls
 ;; arrangement.core/commit!). CI pins every one of them to the same SHAs.
-;;
-;; arrangement/prolly-tree/io-ipld depend on the npm package @noble/hashes
-;; and io-multiformats depends on npm package "hashes" -- `npm install`
-;; this repo's package.json before running (see README).
 (ns run-tests
   (:require [cljs.test :as t]
             [ayatori.public-api-test]
