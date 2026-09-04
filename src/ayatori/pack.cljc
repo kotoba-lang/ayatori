@@ -45,7 +45,8 @@
   `ipld.car.v2/read-frame` does, on every frame it parses, so a pack that
   names a block it does not contain is rejected by the reader rather than by
   a check this namespace could forget to run."
-  (:require [ipld.car.bytes :as b]
+  (:require [ipld.car :as car]
+            [ipld.car.bytes :as b]
             [ipld.car.index :as idx]
             [ipld.car.v2 :as car2]))
 
@@ -93,6 +94,33 @@
                      :profile profile})))
   profile)
 
+(defn- bounded-index
+  "The index records with a frame length attached to each.
+
+  `ipld.car.v2/locate` returns only `:file-offset`, and says why: the CARv2
+  index stores where a frame starts and not how long it is, so a reader
+  either reads to the next record or over-fetches. Over-fetching is what the
+  read-ahead ceiling does, and it is expensive -- measured 2026-09-04, a
+  packed query moved 394 KB where the per-object path moved 110 KB, because
+  every block was requested as 64 KiB regardless of its real size. Round
+  trips went down and transfer went UP.
+
+  Reading to the next record needs no extra fetch: sort the records by
+  payload offset, and each frame ends where the next one begins. The last
+  one ends at the end of the CARv1 payload, which the header already gives
+  as `:data-size`. The result is an exact upper bound on every frame."
+  [{:keys [data-offset data-size]} index]
+  (let [sorted (vec (sort-by :payload-offset index))
+        end (+ data-offset data-size)]
+    (vec (map-indexed
+          (fn [i r]
+            (let [start (+ data-offset (:payload-offset r))
+                  next-start (if-let [n (get sorted (inc i))]
+                               (+ data-offset (:payload-offset n))
+                               end)]
+              (assoc r :file-offset start :frame-length (- next-start start))))
+          sorted))))
+
 (defn open-pack
   "Read a pack's header and index, and return a handle for block reads.
 
@@ -131,14 +159,20 @@
     (let [index (idx/decode (fetch (str "bytes=" index-offset "-")) 0)]
       {:header header
        :index index
+       :bounded (bounded-index header index)
        :reads reads
        :read-ahead (or read-ahead default-read-ahead)
        :fetch fetch})))
 
 (defn locate
-  "Where `cid` starts in this pack, or nil when the pack does not carry it."
-  [{:keys [header index]} cid]
-  (car2/locate header index cid))
+  "Where `cid` starts in this pack and how long its frame is, or nil when the
+  pack does not carry it.
+
+  Unlike `ipld.car.v2/locate` this returns `:frame-length` too, derived from
+  the neighbouring index records rather than fetched -- see `bounded-index`."
+  [{:keys [header bounded]} cid]
+  (let [{:keys [digest]} (car/read-cid (car/cid->bytes cid) 0)]
+    (some (fn [r] (when (b/equal? digest (:digest r)) r)) bounded)))
 
 (defn read-block
   "Read one block out of an opened pack with a single range request.
@@ -150,7 +184,13 @@
   checked against the identity the index claimed."
   [{:keys [fetch read-ahead] :as pack} cid]
   (when-let [loc (locate pack cid)]
-    (let [body (fetch (car2/range-open loc read-ahead))
+    (let [body (fetch (if-let [len (:frame-length loc)]
+                        ;; exact: the index's neighbours bound the frame, so
+                        ;; nothing is over-fetched
+                        (car2/range-header (assoc loc :frame-length len))
+                        ;; a pack whose index gave no neighbour to bound
+                        ;; against still works, by over-fetching
+                        (car2/range-open loc read-ahead)))
           {frame-cid :cid frame-bytes :bytes} (car2/read-frame body 0)]
       (when-not (= (str cid) (str frame-cid))
         (throw (ex-info "ayatori: pack index pointed at a different block"

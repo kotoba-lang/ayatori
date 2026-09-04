@@ -121,6 +121,26 @@ stops being.
 `pack-fetcher` has the same shape as the per-object fetcher, so the verified
 getter's CID rehash, provider fallback and memo are unchanged.
 
+Better still, pass it as `:block-source`, which is tried **before** discovery:
+
+```clojure
+(remote/open-snapshot
+ {:snapshot-cid  cid
+  :discover-fn   my-discover-fn                 ; still there, for the fallback
+  :fetch-fn      my-fetch-fn
+  :block-source  #(pack/read-block p %)         ; no IPNI lookup when it answers
+  :blind-fn      blind :decrypt-fn decrypt})
+```
+
+Measured: a getter reading 6 blocks costs 6 discoveries through `:fetch-fn`
+and **0** through `:block-source`. A source that returns nil falls through to
+discovery; one that returns the wrong bytes is refused by the same CID rehash
+a provider's bytes get, skipped rather than made fatal, and counted as
+`:source-failures` so a corrupt pack is visible rather than merely slow.
+
+⚠ `:block-source` is threaded through the **synchronous** getter only. A
+Worker on `open-snapshot-async` still pays discovery per block behind a pack.
+
 ### There is no default block layout, and `:packed-blocks` needs `:range-read`
 
 Per ADR-2608160100, a backend declares one of:
@@ -138,6 +158,41 @@ Every assertion about correctness passes. Only transfer explodes. It is a
 success that reads as a success, so nothing downstream can catch it; it has to
 be refused at the only place that knows both halves. The profile is checked
 before any request is issued.
+
+### Measured against the per-object path
+
+`bench/fitness.cljs` answers the same query over the same snapshot through both
+paths and refuses (exit 2) if they ever disagree on the answer, so a cheaper arm
+cannot win by returning less. Counts, never wall clock — ADR-2608160100 sets the
+metric as round trips, and this repo is developed on a machine running many
+agents at once.
+
+At 800 subjects / 1600 quads / 23 blocks, answer fixed at 3 rows:
+
+| path | round trips | bytes |
+|---|---|---|
+| per-object (discover + fetch per block) | 12 | 109,764 |
+| packed, 64 KiB read-ahead | 8 | **394,217** |
+| packed, exact frame range | **8** | **110,996** |
+
+The middle row is why `bounded-index` exists. `ipld.car.v2/locate` returns
+only `:file-offset`, because the CARv2 index stores where a frame starts and
+not how long it is — so a reader either over-fetches or reads to the next
+record. Over-fetching *reduced round trips and tripled transfer*: a win on the
+metric the ADR names and a loss on the one that scales. Reading to the next
+record needs no extra fetch (the records are sorted, and the header gives the
+payload end), and the derived lengths are asserted equal to the ones `pack`
+itself computed.
+
+Net: **1.50× fewer round trips at parity transfer** — the +1.1% is the header
+and index reads, which are bounded rather than proportional.
+
+Across a 16× database sweep with the answer size held at 3 rows, per-object
+round trips grew 2.00×, so the persistent path is not O(database); it follows
+the index ranges the query names.
+
+The full loop that produced this — including the hypothesis the measurement
+refuted — is `bench/coscientist-iteration-01.edn`.
 
 ### Costs, in round trips
 

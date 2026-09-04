@@ -299,3 +299,34 @@
        (is (some #{range-root} @fetched))
        (is (not (some #{pos-root} @fetched))
            "a declared range must not fall back to the ordinary pos tree"))))
+
+#?(:cljs
+   (deftest the-sync-api-refuses-promise-returning-crypto-instead-of-answering-empty
+     ;; Measured 2026-09-04 under nbb: the same snapshot answered #{["s1"]}
+     ;; with a synchronous blind-fn and #{} with a Promise-returning one, with
+     ;; no error in between -- a query that COULD NOT RUN returning what a
+     ;; query that ran and matched nothing returns. And `arrangement.core/
+     ;; commit!` REQUIRES Promise-returning blind/encrypt on cljs, so
+     ;; following its contract and then opening synchronously is the natural
+     ;; way to arrive here.
+     (let [opts {:snapshot-cid "bafyreiabcdefghijklmnopqrstuvwxyz234567abcdefghijklmnopq"
+                 :discover-fn (fn [cid] (providers cid ["p"]))
+                 :fetch-fn (fn [_ _] nil)}
+           thrown (fn [o] (try (remote/open-snapshot o) nil
+                               (catch :default e (:type (ex-data e)))))]
+       (testing "a Promise-returning blind-fn is refused, naming the async API"
+         (is (= :ayatori/async-crypto-in-sync-api
+                (thrown (assoc opts :blind-fn #(js/Promise.resolve (pr-str %))
+                               :decrypt-fn identity)))))
+       (testing "so is a Promise-returning decrypt-fn"
+         (is (= :ayatori/async-crypto-in-sync-api
+                (thrown (assoc opts :blind-fn pr-str
+                               :decrypt-fn #(js/Promise.resolve %))))))
+       (testing "a blind-fn that throws on the probe tells us nothing, so it is
+                 allowed through rather than refused on a guess"
+         (is (not= :ayatori/async-crypto-in-sync-api
+                   (thrown (assoc opts
+                                  :blind-fn (fn [x] (if (keyword? x)
+                                                      (throw (js/Error. "no keywords"))
+                                                      (pr-str x)))
+                                  :decrypt-fn identity))))))))
