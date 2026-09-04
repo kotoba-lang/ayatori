@@ -14,6 +14,7 @@
 
   The transport is injected, so none of this touches a network."
   (:require [ayatori.discovery :as discovery]
+            [clojure.string :as str]
             [clojure.test :refer [deftest is testing]]
             #?(:cljs [cljs.test :refer [async]])))
 
@@ -29,7 +30,7 @@
   mapped to `::boom`."
   [m]
   (fn [{:keys [url]}]
-    (let [router (first (filter #(clojure.string/starts-with? url %) (keys m)))
+    (let [router (first (filter #(str/starts-with? url %) (keys m)))
           answer (get m router)]
       (if (= ::boom answer)
         (throw (ex-info "connection refused" {:url url}))
@@ -114,7 +115,7 @@
      ;; here while turning one dead router into a lookup that never resolves.
      (async done
        (let [http-fn (fn [{:keys [url]}]
-                       (if (clojure.string/starts-with? url r1)
+                       (if (str/starts-with? url r1)
                          (js/Promise.reject (js/Error. "connection refused"))
                          (js/Promise.resolve {:status 200 :body (body ["peerB"])})))]
          (-> (discovery/find-providers-async http-fn cid {:routers [r1 r2] :quorum 1})

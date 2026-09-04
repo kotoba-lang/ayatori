@@ -33,9 +33,10 @@
   (fn [{:keys [range]}]
     (swap! counter inc)
     (let [[_ from to] (re-matches #"bytes=(\d+)-(\d*)" range)
-          start (js/parseInt from 10)
+          n #(#?(:clj Long/parseLong :cljs js/parseInt) %)
+          start (n from)
           total (b/bcount archive)
-          end (if (seq to) (min total (inc (js/parseInt to 10))) total)]
+          end (if (seq to) (min total (inc (n to))) total)]
       (b/slice archive start (min end total)))))
 
 (def ^:private packed-profile
