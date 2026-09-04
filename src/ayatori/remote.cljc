@@ -62,7 +62,41 @@
 
 (def ^:private empty-stats
   {:discoveries 0 :fetch-attempts 0 :provider-failures 0
-   :verified-blocks 0 :memo-hits 0 :in-flight-hits 0 :verified-bytes 0})
+   :verified-blocks 0 :memo-hits 0 :in-flight-hits 0 :verified-bytes 0
+   :source-attempts 0 :source-hits 0 :source-failures 0})
+
+(defn- promise-like?
+  "Thenable, in the JS sense. Always false on the JVM."
+  [x]
+  #?(:cljs (and (some? x) (fn? (unchecked-get x "then")))
+     :clj  false))
+
+(defn- refuse-async-crypto!
+  "The synchronous snapshot API cannot await a Promise, and does not notice
+  one: a Promise-returning `blind-fn` produces a blinded key that matches
+  nothing, so every scan comes back EMPTY -- indistinguishable from a query
+  that ran and matched nothing.
+
+  Measured 2026-09-04 under nbb: the same snapshot answered `#{[\"s1\"]}` with
+  a synchronous blind-fn and `#{}` with a Promise-returning one, with no
+  error in between. And `arrangement.core/commit!` REQUIRES Promise-returning
+  blind/encrypt on cljs, so following its contract and then opening the
+  snapshot synchronously is the natural way to reach this.
+
+  Probing costs one call with a sentinel. A blind-fn that throws on the
+  sentinel tells us nothing, so that case is allowed through rather than
+  refused on a guess."
+  [label f]
+  (let [probed (try {:ok (f ::ayatori-probe)}
+                    (catch #?(:clj Exception :cljs :default) _ nil))]
+    (when (and probed (promise-like? (:ok probed)))
+      (throw (ex-info (str "ayatori: " label " returned a Promise, and the "
+                           "synchronous snapshot API cannot await it -- every "
+                           "scan would come back empty rather than fail. Use "
+                           "open-snapshot-async, or pass a synchronous "
+                           label ".")
+                      {:type :ayatori/async-crypto-in-sync-api
+                       :fn label})))))
 
 (defn- stats-atom [stats]
   (let [stats (or stats (atom {}))]
@@ -266,10 +300,13 @@
   The transport is synchronous because `arrangement.source/cursor` is
   synchronous. A Worker-native async cursor is a separate API rather than a
   Promise hidden inside this one."
-  [{:keys [discover-fn fetch-fn stats block-memo]}]
+  [{:keys [discover-fn fetch-fn stats block-memo block-source]}]
   (when-not (fn? discover-fn)
     (throw (ex-info "ayatori: discover-fn is required"
                     {:type :ayatori/missing-discover-fn})))
+  (when (and (some? block-source) (not (fn? block-source)))
+    (throw (ex-info "ayatori: block-source must be a function of one CID"
+                    {:type :ayatori/invalid-block-source})))
   (when-not (fn? fetch-fn)
     (throw (ex-info "ayatori: fetch-fn is required"
                     {:type :ayatori/missing-fetch-fn})))
@@ -281,7 +318,28 @@
       (validate-cid! cid)
       (if-let [cached (get @block-memo cid)]
         (do (swap! stats update :memo-hits inc) cached)
-        (let [result (try
+        (if-let [local (when block-source
+                         (swap! stats update :source-attempts inc)
+                         ;; Verified on the same path as a provider's bytes:
+                         ;; being local is not being trusted. A source that
+                         ;; answers with the wrong bytes, or throws, is SKIPPED
+                         ;; the way a mismatching provider is -- but counted, so
+                         ;; a corrupt pack shows up as :source-failures rather
+                         ;; than as a lookup that merely got slower.
+                         (try
+                           (when-let [bytes (block-source cid)]
+                             (let [verified (verify-block! cid bytes)]
+                               (swap! block-memo assoc cid verified)
+                               (swap! stats #(-> %
+                                                 (update :source-hits inc)
+                                                 (update :verified-blocks inc)
+                                                 (update :verified-bytes + (byte-count verified))))
+                               verified))
+                           (catch #?(:clj Exception :cljs :default) _
+                             (swap! stats update :source-failures inc)
+                             nil)))]
+          local
+          (let [result (try
                        (swap! stats update :discoveries inc)
                        (discover-fn cid)
                        (catch #?(:clj Exception :cljs :default) e
@@ -317,7 +375,7 @@
                     (recur (next remaining) (conj failures (:failure attempt))))))
               (throw (ex-info "ayatori: no provider returned a verified block"
                               {:type :ayatori/all-providers-failed
-                               :cid cid :attempts failures})))))))))
+                               :cid cid :attempts failures}))))))))))
 
 #?(:cljs
    (defn provider-block-getter-async
@@ -327,6 +385,10 @@
      are tried in discovery order; only bytes whose SHA-256 multihash matches
      the requested CID are memoised. The memo stores resolved verified bytes,
      never a rejected Promise or an unverified response."
+     ;; NOTE: `:block-source` is threaded through the synchronous getter only.
+     ;; The Worker-native path would need the source's result awaited and
+     ;; coalesced with `:in-flight`, which is a different piece of work; until
+     ;; then a Worker pays discovery per block even behind a pack.
      [{:keys [discover-fn fetch-fn stats block-memo in-flight]}]
      (let [stats (stats-atom stats)
            block-memo (or block-memo (atom {}))
@@ -404,13 +466,19 @@
   - `:http-fn` and optional `:discovery-opts`, which are composed through
     `ayatori.discovery/find-providers`.
 
+  `:block-source` is optional: `(fn [cid] -> bytes-or-nil)`, tried BEFORE
+  discovery and verified on the same path as a provider's bytes. A source
+  that answers serves the read without an IPNI lookup; one that returns nil
+  falls through. `ayatori.pack/read-block` has exactly this shape, which is
+  the point -- a packed read does not need to be told where the block is.
+
   `:partitions` is the same declared range-partition vector used when the
   snapshot was committed. The return value is an opened session containing
   `:source`, `:get-block`, and caller-observable `:stats`. Opening verifies
   the snapshot block immediately; index blocks remain lazy and are fetched
   only when a query reaches their ranges."
   [{:keys [snapshot-cid discover-fn http-fn discovery-opts fetch-fn
-           blind-fn decrypt-fn partitions stats block-memo]}]
+           blind-fn decrypt-fn partitions stats block-memo block-source]}]
   (when-not (string? snapshot-cid)
     (throw (ex-info "ayatori: snapshot-cid must be a CID string"
                     {:type :ayatori/invalid-snapshot-cid :value snapshot-cid})))
@@ -420,6 +488,8 @@
   (when-not (fn? decrypt-fn)
     (throw (ex-info "ayatori: decrypt-fn is required"
                     {:type :ayatori/missing-decrypt-fn})))
+  (refuse-async-crypto! "blind-fn" blind-fn)
+  (refuse-async-crypto! "decrypt-fn" decrypt-fn)
   (let [discover-fn (or discover-fn
                         (when (fn? http-fn)
                           (fn [cid]
@@ -429,6 +499,7 @@
         block-memo (or block-memo (atom {}))
         get-block (provider-block-getter {:discover-fn discover-fn
                                           :fetch-fn fetch-fn
+                                          :block-source block-source
                                           :stats stats
                                           :block-memo block-memo})
         source (arrangement-source/cursor get-block snapshot-cid blind-fn

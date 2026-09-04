@@ -12,6 +12,9 @@
             [ipld.car.v2 :as car2]
             [ipld.core :as ipld]))
 
+(defn- parse-int [x]
+  #?(:clj (Long/parseLong x) :cljs (js/parseInt x 10)))
+
 (defn- some-bytes?
   "`b/equal?` answers true for two nils, so an assertion that only compares
   bytes passes when BOTH sides are missing. Measured while writing this file:
@@ -33,10 +36,9 @@
   (fn [{:keys [range]}]
     (swap! counter inc)
     (let [[_ from to] (re-matches #"bytes=(\d+)-(\d*)" range)
-          n #(#?(:clj Long/parseLong :cljs js/parseInt) %)
-          start (n from)
+          start (parse-int from)
           total (b/bcount archive)
-          end (if (seq to) (min total (inc (n to))) total)]
+          end (if (seq to) (min total (inc (parse-int to))) total)]
       (b/slice archive start (min end total)))))
 
 (def ^:private packed-profile
@@ -169,3 +171,164 @@
                (catch #?(:clj Exception :cljs :default) e e))]
     (is (some? e) "bytes that hash to another CID must not be returned")
     (is (= :ayatori/pack-index-mismatch (:type (ex-data e))))))
+
+(deftest a-block-read-fetches-the-frame-and-not-a-read-ahead-window
+  ;; Measured 2026-09-04 before this: `range-open` asked for
+  ;; `default-read-ahead` (64 KiB) per block because the CARv2 index stores
+  ;; where a frame starts and not how long it is. Round trips went DOWN and
+  ;; transfer went UP -- a packed query moved 394 KB where the per-object path
+  ;; moved 110 KB for the same three rows. The neighbouring index records
+  ;; bound each frame with no extra fetch, so nothing has to be over-read.
+  (let [bs (blocks 8)
+        packed (car2/pack {:roots [(:cid (first bs))] :blocks bs})
+        archive (:bytes packed)
+        asked (atom [])
+        range-fn (fn [{:keys [range]}]
+                   (swap! asked conj range)
+                   ((range-server archive (atom 0)) {:range range}))
+        p (pack/open-pack {:range-fn range-fn :profile packed-profile})]
+    (reset! asked [])
+    (doseq [{:keys [cid bytes]} bs]
+      (let [got (pack/read-block p cid)]
+        (is (some-bytes? got))
+        (is (b/equal? bytes got))))
+    (testing "every request is a bounded range, never an open-ended one"
+      (is (= (count bs) (count @asked)))
+      (is (every? #(re-matches #"bytes=\d+-\d+" %) @asked)
+          (str "open-ended ranges: " (pr-str (remove #(re-matches #"bytes=\d+-\d+" %) @asked)))))
+    (testing "and asks for no more bytes than the frames actually occupy"
+      (let [requested (reduce + (map (fn [r]
+                                       (let [[_ a b] (re-matches #"bytes=(\d+)-(\d+)" r)]
+                                         (inc (- (parse-int b) (parse-int a)))))
+                                     @asked))
+            actual (reduce + (map :frame-length (:entries packed)))]
+        (is (= requested actual)
+            (str "requested " requested " bytes for frames totalling " actual))
+        (is (< requested (* (count bs) pack/default-read-ahead))
+            "the read-ahead ceiling is the fallback, not the normal path")))))
+
+(deftest the-derived-frame-lengths-match-what-pack-reported
+  ;; `bounded-index` derives each length from the next record's offset. `pack`
+  ;; already knows the real lengths, so the two must agree -- if they ever
+  ;; drift, a read either truncates a frame or pulls in the next one.
+  (let [bs (blocks 6)
+        packed (car2/pack {:roots [(:cid (first bs))] :blocks bs})
+        p (pack/open-pack {:range-fn (range-server (:bytes packed) (atom 0))
+                           :profile packed-profile})]
+    (doseq [{:keys [cid file-offset frame-length]} (:entries packed)]
+      (let [loc (pack/locate p cid)]
+        (is (some? loc) (str "not located: " cid))
+        (is (= file-offset (:file-offset loc)))
+        (is (= frame-length (:frame-length loc))
+            (str "derived length disagrees with pack's own for " cid))))))
+
+;; ---------------------------------------- discovery a packed read does not need
+
+(deftest a-block-source-serves-reads-without-paying-for-discovery
+  ;; Measured before this option existed: `provider-block-getter` called
+  ;; `discover-fn` once per block even when the fetch-fn ignored the provider
+  ;; entirely -- which is exactly what `pack-fetcher` does. Those IPNI lookups
+  ;; were pure waste: N round trips whose results were discarded, halving the
+  ;; benefit of packing the blocks in the first place.
+  (let [bs (blocks 6)
+        archive (:bytes (car2/pack {:roots [(:cid (first bs))] :blocks bs}))
+        counter (atom 0)
+        p (pack/open-pack {:range-fn (range-server archive counter)
+                           :profile packed-profile})
+        discoveries (atom 0)
+        discover (fn [cid]
+                   (swap! discoveries inc)
+                   {:ok? true :cid cid :mutates-cid? false
+                    :providers [{:plane :discovery :cid cid :peer "p"
+                                 :addrs [] :mutates-cid? false}]})
+        stats (atom {})
+        getter (remote/provider-block-getter
+                {:discover-fn discover
+                 :fetch-fn (fn [_ _] nil)
+                 :block-source #(pack/read-block p %)
+                 :stats stats})]
+    (doseq [{:keys [cid bytes]} bs]
+      (let [got (getter cid)]
+        (is (some-bytes? got))
+        (is (b/equal? bytes got))))
+    (testing "not one IPNI lookup was needed"
+      (is (zero? @discoveries))
+      (is (zero? (:fetch-attempts @stats)))
+      (is (= (count bs) (:source-hits @stats)))
+      (is (= (count bs) (:verified-blocks @stats))))))
+
+(deftest a-source-that-does-not-have-the-block-falls-through-to-providers
+  (let [bs (blocks 3)
+        archive (:bytes (car2/pack {:roots [(:cid (first bs))] :blocks bs}))
+        absent (ipld/node->block {"not" "packed"})
+        p (pack/open-pack {:range-fn (range-server archive (atom 0))
+                           :profile packed-profile})
+        discoveries (atom 0)
+        stats (atom {})
+        getter (remote/provider-block-getter
+                {:discover-fn (fn [cid]
+                                (swap! discoveries inc)
+                                {:ok? true :cid cid :mutates-cid? false
+                                 :providers [{:plane :discovery :cid cid :peer "p"
+                                              :addrs [] :mutates-cid? false}]})
+                 :fetch-fn (fn [_ cid]
+                             (when (= (str cid) (str (:cid absent)))
+                               (:bytes absent)))
+                 :block-source #(pack/read-block p %)
+                 :stats stats})]
+    (testing "a block the pack carries costs no discovery"
+      (is (some-bytes? (getter (:cid (first bs)))))
+      (is (zero? @discoveries)))
+    (testing "a block it does not carry falls through, and is still verified"
+      (is (b/equal? (:bytes absent) (getter (:cid absent))))
+      (is (= 1 @discoveries))
+      (is (= 1 (:fetch-attempts @stats))))))
+
+(deftest a-block-source-is-not-trusted-just-because-it-is-local
+  (let [wanted (ipld/node->block {"kind" "wanted"})
+        wrong (ipld/node->block {"kind" "wrong"})
+        stats (atom {})
+        memo (atom {})
+        getter (remote/provider-block-getter
+                {:discover-fn (fn [cid]
+                                {:ok? true :cid cid :mutates-cid? false
+                                 :providers [{:plane :discovery :cid cid :peer "p"
+                                              :addrs [] :mutates-cid? false}]})
+                 :fetch-fn (fn [_ _] nil)
+                 :block-source (fn [_] (:bytes wrong))
+                 :stats stats
+                 :block-memo memo})]
+    (testing "bytes that do not hash to the requested CID are refused, from a
+              local source exactly as from a provider -- and the source is
+              skipped rather than made fatal, the way a mismatching provider is"
+      (is (thrown? #?(:clj Exception :cljs :default) (getter (:cid wanted)))
+          "no provider had it either, so the lookup still fails"))
+    (testing "the refusal is counted, so a corrupt source is visible rather than
+              merely slow"
+      (is (= 1 (:source-failures @stats)))
+      (is (zero? (:source-hits @stats))))
+    (testing "and the wrong bytes are never cached"
+      (is (empty? @memo)))))
+
+(deftest a-corrupt-source-is-skipped-and-a-provider-still-serves-the-block
+  (let [wanted (ipld/node->block {"kind" "wanted"})
+        wrong (ipld/node->block {"kind" "wrong"})
+        stats (atom {})
+        getter (remote/provider-block-getter
+                {:discover-fn (fn [cid]
+                                {:ok? true :cid cid :mutates-cid? false
+                                 :providers [{:plane :discovery :cid cid :peer "p"
+                                              :addrs [] :mutates-cid? false}]})
+                 :fetch-fn (fn [_ _] (:bytes wanted))
+                 :block-source (fn [_] (:bytes wrong))
+                 :stats stats})]
+    (is (b/equal? (:bytes wanted) (getter (:cid wanted)))
+        "a source answering with another block's bytes must not deny the read")
+    (is (= 1 (:source-failures @stats)))
+    (is (= 1 (:discoveries @stats)) "the fallback path was taken")))
+
+(deftest a-block-source-must-be-a-function
+  (is (thrown? #?(:clj Exception :cljs :default)
+               (remote/provider-block-getter
+                {:discover-fn (fn [_] nil) :fetch-fn (fn [_ _] nil)
+                 :block-source "not a function"}))))
