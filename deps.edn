@@ -14,7 +14,10 @@
  ;; `src/ayatori/discovery.cljc`.
  ;;
  ;; `ayatori.remote` directly uses io-ipld for verification and
- ;; io-multiformats for advertised gateway addresses. `arrangement` pulls in
+ ;; io-multiformats for advertised gateway addresses. `ayatori.pack` uses
+ ;; io-ipld-car for the CARv2 codec and its index -- reading packs, never
+ ;; writing them; a second encoder is how the `:file-offset` versus
+ ;; `:payload-offset` convention drifts. `arrangement` pulls in
  ;; prolly-tree/datom-source/datalog; tools.deps resolves the remaining chain
  ;; from the pinned direct deps below for the JVM :test alias. The nbb primary test path
  ;; has no dependency resolver, so `bin/run_tests.cljs` / CI clone each of
@@ -27,6 +30,8 @@
         {:git/sha "9c9f45d4cd043873cd5c5ea65fa3af8a8ead5e6d"}
         io.github.kotoba-lang/io-ipld
         {:git/sha "f99bf27d58a75bb8cf6ddfd2d57a0aaac9c824ac"}
+        io.github.kotoba-lang/io-ipld-car
+        {:git/sha "5817936ddfc3d3f4b3283762f09c9d0db42c8dce"}
         io.github.kotoba-lang/io-multiformats
         {:git/sha "561fe7dfada3db852b127f06d41750dabd3cead9"}
         io.github.kotoba-lang/io-ipni-specs

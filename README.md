@@ -455,6 +455,7 @@ git clone https://github.com/kotoba-lang/kotobase .deps/kotobase
 git clone https://github.com/kotoba-lang/arrangement .deps/arrangement
 git clone https://github.com/kotoba-lang/prolly-tree .deps/prolly-tree
 git clone https://github.com/kotoba-lang/io-ipld .deps/io-ipld
+git clone https://github.com/kotoba-lang/io-ipld-car .deps/io-ipld-car
 git clone https://github.com/kotoba-lang/io-multiformats .deps/io-multiformats
 git clone https://github.com/kotoba-lang/org-ietf-cbor .deps/org-ietf-cbor
 git clone https://github.com/kotoba-lang/dev-protobuf .deps/dev-protobuf
@@ -462,7 +463,7 @@ git clone https://github.com/kotoba-lang/datom-source .deps/datom-source
 git clone https://github.com/kotoba-lang/datalog .deps/datalog
 git clone https://github.com/kotoba-lang/io-ipni-specs .deps/io-ipni-specs
 git clone https://github.com/kotoba-lang/org-nist-sha2 .deps/org-nist-sha2
-nbb --classpath "src:test:.deps/kotobase/src:.deps/arrangement/src:.deps/prolly-tree/src:.deps/io-ipld/src:.deps/io-multiformats/src:.deps/org-ietf-cbor/src:.deps/dev-protobuf/src:.deps/datom-source/src:.deps/datalog/src:.deps/io-ipni-specs/src:.deps/org-nist-sha2/src" bin/run_tests.cljs
+nbb --classpath "src:test:.deps/kotobase/src:.deps/arrangement/src:.deps/prolly-tree/src:.deps/io-ipld/src:.deps/io-ipld-car/src:.deps/io-multiformats/src:.deps/org-ietf-cbor/src:.deps/dev-protobuf/src:.deps/datom-source/src:.deps/datalog/src:.deps/io-ipni-specs/src:.deps/org-nist-sha2/src" bin/run_tests.cljs
 ```
 
 Each `.deps/<name>` should be checked out at the SHA pinned in `deps.edn`
