@@ -461,13 +461,17 @@ git clone https://github.com/kotoba-lang/dev-protobuf .deps/dev-protobuf
 git clone https://github.com/kotoba-lang/datom-source .deps/datom-source
 git clone https://github.com/kotoba-lang/datalog .deps/datalog
 git clone https://github.com/kotoba-lang/io-ipni-specs .deps/io-ipni-specs
-nbb --classpath "src:test:.deps/kotobase/src:.deps/arrangement/src:.deps/prolly-tree/src:.deps/io-ipld/src:.deps/io-multiformats/src:.deps/org-ietf-cbor/src:.deps/dev-protobuf/src:.deps/datom-source/src:.deps/datalog/src:.deps/io-ipni-specs/src" bin/run_tests.cljs
+git clone https://github.com/kotoba-lang/org-nist-sha2 .deps/org-nist-sha2
+nbb --classpath "src:test:.deps/kotobase/src:.deps/arrangement/src:.deps/prolly-tree/src:.deps/io-ipld/src:.deps/io-multiformats/src:.deps/org-ietf-cbor/src:.deps/dev-protobuf/src:.deps/datom-source/src:.deps/datalog/src:.deps/io-ipni-specs/src:.deps/org-nist-sha2/src" bin/run_tests.cljs
 ```
 
 Each `.deps/<name>` should be checked out at the SHA pinned in `deps.edn`
 (`kotobase`, `arrangement`, `io-ipld`, `io-multiformats`, `io-ipni-specs`) or in the dependency
-repos' own `deps.edn` transitively (`prolly-tree`, `io-multiformats`,
-`org-ietf-cbor`, `dev-protobuf`, `datom-source`, `datalog`) — CI pins every one of them, see
+repos' own `deps.edn` transitively (`prolly-tree`,
+`org-ietf-cbor`, `dev-protobuf`, `datom-source`, `datalog`, and `org-nist-sha2`
+— which io-multiformats requires as `sha2.core`, and whose absence made every
+documented reproduction of this suite die before the first test until
+2026-09-04) — CI pins every one of them, see
 `.github/workflows/ci.yml`.
 
 The `:test` alias in `deps.edn` is the JVM **compat** suite only (`clojure

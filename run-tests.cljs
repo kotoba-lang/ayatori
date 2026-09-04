@@ -1,26 +1,35 @@
 (ns run-tests
-  "The suite under ClojureScript.
+  "The suite under ClojureScript, for the murakumo fleet's cross-runtime gate.
 
   Ayatori bridges query surfaces onto the datom plane inside the Worker.
-
-  This repo had no ClojureScript entry, so the murakumo fleet could only
-  gate its JVM half. Counts were measured to match before this was added --
-  that measurement, not the `.cljc` extension, is what earns a second gate.
   Measured 2026-08-17 on datom-source: a portable suite can be green on the
   JVM and red under nbb for reasons production does not have (SCI deftype
-  behaviour), so `.cljc` alone is not grounds.
+  behaviour), so the `.cljc` extension alone is not grounds for a second
+  gate -- a matching measurement is.
 
-      npx nbb --classpath src:test run-tests.cljs"
-  (:require [cljs.test :as t]
-            [ayatori.public-api-test]
-            [kotobase.query.bridge-test]
-            [kotobase.query.agent-test]
-            [kotobase.query.agent-engine-test]))
+      npx nbb --classpath src:test:<deps> run-tests.cljs
 
-(defmethod t/report [::t/default :end-run-tests] [m]
-  (when-not (t/successful? m)
-    (js/process.exit 1)))
+  ## What changed here, and why (2026-09-04)
 
-;; A pattern, not a second list of namespaces to run: a runner that repeats
-;; the list can fall behind the suite and report a subset as a pass.
-(t/run-all-tests #"^ayatori\..*-test$|^kotobase\.query\..*-test$|^kotobase\.query-test$")
+  This file used to name four namespaces in `:require` and then call
+  `t/run-all-tests` with a namespace PATTERN, on the reasoning -- correct as
+  far as it went -- that \"a runner that repeats the list can fall behind the
+  suite and report a subset as a pass\".
+
+  The pattern did not fix that. It filters namespaces that are LOADED, and
+  what gets loaded is decided by the `:require` list it was meant to
+  replace. Its regex matched `ayatori.remote-test`; the require list omitted
+  it; so this entry -- the one the fleet gate runs, the one whose docstring
+  called it the whole suite -- silently skipped the ONE namespace covering
+  discovery -> fetch -> CID verification and reported 66 tests as a pass,
+  while the repo's `:jvm-test` gate saw all 77 and also reported a pass.
+  Two green gates, two different suites, no way to tell from either output.
+
+  `ayatori.suite` now derives the set from the files on disk, so there is no
+  list here to fall behind."
+  (:require [ayatori.suite :as suite]))
+
+;; Top level on purpose: nbb awaits top-level loads and does not await one
+;; issued from inside a function.
+(apply require (suite/test-namespaces))
+(suite/run!)
