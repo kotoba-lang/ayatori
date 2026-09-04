@@ -1,8 +1,8 @@
 (ns run-tests-pure
   "The half of this suite that needs no dependencies.
 
-  `run-tests.cljs` is the whole suite and requires `arrangement`, `kotobase`
-  and four transitive repos on the classpath — reasonable for CI, expensive
+  `run-tests.cljs` runs the whole suite and needs `arrangement`, `kotobase`
+  and six transitive repos on the classpath — reasonable for CI, expensive
   for a gate. `kotobase.query.agent` deliberately depends on nothing, so the
   check that fabricated attributes and unwrapped predicates are refused can
   run anywhere with:
@@ -11,14 +11,24 @@
 
   ⚠ This entry names its namespaces in `:require`, so a future
   dependency-free test namespace that is not added here would be silently
-  skipped by it — the failure mode `run-tests.cljs` warns about. It is here
-  anyway because a gate nobody can afford to run is not a gate; the whole
-  suite remains the authority, and this one is a subset that says so."
+  skipped by it. That is the failure mode `run-tests.cljs` used to warn
+  about and then commit anyway: measured 2026-09-04, it skipped
+  `ayatori.remote-test` and reported the remaining 66 tests as a pass. It is
+  fixed there by deriving the set from disk (`ayatori.suite`); this entry
+  keeps its hand-written list because its whole purpose is to load nothing
+  it does not have to.
+
+  So this one prints what it covered and what the whole suite is, and the
+  numbers are meant to be read together — a gate nobody can afford to run is
+  not a gate, but a subset that does not say it is a subset is worse."
   (:require [cljs.test :as t]
             [kotobase.query.agent-test]))
 
 (defmethod t/report [::t/default :end-run-tests] [m]
   (when-not (t/successful? m)
     (js/process.exit 1)))
+
+(println "SUBSET: this entry runs kotobase.query.agent-test only."
+         "The whole suite is `run-tests.cljs` (5 namespaces).")
 
 (t/run-all-tests #"^kotobase\.query\.agent-test$")

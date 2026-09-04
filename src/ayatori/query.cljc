@@ -3,10 +3,15 @@
 
   Ayatori weaves content-addressed graph data into queryable projections:
   IPLD owns values, links, traversal and verification; IPNI discovers
-  providers for CIDs; this namespace owns the query-facing materialization
-  and access paths. IPNI discovery is deliberately not implemented by this
-  namespace yet -- finding a provider and evaluating a query remain separate
-  effects.
+  providers for CIDs; CARv2 says where inside an object a block begins; this
+  namespace owns the query-facing materialization and access paths.
+
+  Discovery is deliberately absent from THIS namespace, and that is a
+  boundary rather than a gap: finding a provider and evaluating a query are
+  separate effects, and keeping them in separate namespaces is what stops an
+  indexer response from being read as content. The wiring that does connect
+  them -- discover, fetch, rehash, cursor, query -- is `ayatori.remote`, and
+  the packed-block source it can read through is `ayatori.pack`.
 
   The implementation currently delegates to the compatibility namespace
   `kotobase.query.bridge`, so existing callers can migrate without changing

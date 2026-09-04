@@ -35,6 +35,12 @@ jobs:
           path: .deps/io-ipld
       - uses: actions/checkout@v4
         with:
+          repository: kotoba-lang/io-ipld-car
+          # Same pin as deps.edn — `ayatori.pack` reads CARv2 packs.
+          ref: 5817936ddfc3d3f4b3283762f09c9d0db42c8dce
+          path: .deps/io-ipld-car
+      - uses: actions/checkout@v4
+        with:
           repository: kotoba-lang/io-multiformats
           # Same pin as io-ipld's own deps.edn (transitive).
           ref: b3b157e683a943d4f2e9362d9366cceefff3f656
@@ -69,9 +75,20 @@ jobs:
           # Same pin as deps.edn — provider discovery is a direct dependency.
           ref: 2c1559e2703bf41076188539c7086255b0d3c540
           path: .deps/io-ipni-specs
+      - uses: actions/checkout@v4
+        with:
+          repository: kotoba-lang/org-nist-sha2
+          # Transitive through io-multiformats, which requires `sha2.core`.
+          # Missing here until 2026-09-04: without it every run of this
+          # workflow died with "Could not find namespace: sha2.core" before
+          # a single test executed. Nothing noticed, because Actions are
+          # disabled fleet-wide (ADR-2607300900) so the job never started.
+          # Pin is io-multiformats' own.
+          ref: e7c1b250adf3291ef99424fa85d8e7381cb086fb
+          path: .deps/org-nist-sha2
       - uses: actions/setup-node@v4
         with:
           node-version: 22
       - run: npm install --global nbb
       - run: npm install
-      - run: nbb --classpath "src:test:.deps/kotobase/src:.deps/arrangement/src:.deps/prolly-tree/src:.deps/io-ipld/src:.deps/io-multiformats/src:.deps/org-ietf-cbor/src:.deps/dev-protobuf/src:.deps/datom-source/src:.deps/datalog/src:.deps/io-ipni-specs/src" bin/run_tests.cljs
+      - run: nbb --classpath "src:test:.deps/kotobase/src:.deps/arrangement/src:.deps/prolly-tree/src:.deps/io-ipld/src:.deps/io-ipld-car/src:.deps/io-multiformats/src:.deps/org-ietf-cbor/src:.deps/dev-protobuf/src:.deps/datom-source/src:.deps/datalog/src:.deps/io-ipni-specs/src:.deps/org-nist-sha2/src" bin/run_tests.cljs
