@@ -13,10 +13,12 @@ prerequisite (ADR-2607172300 in `com-junkawasaki/root`) for four sibling repos
 data and should not each reimplement this bridge.
 
 The name reflects the boundary: IPLD owns immutable values, links, traversal,
-and verification; IPNI tells Ayatori where a CID may be available; Ayatori
-weaves those inputs into a queryable projection. These are separate effects:
-an IPNI provider result is not proof that content was retrieved or CID-verified,
-and neither is proof that a query was evaluated.
+and verification; IPNI tells Ayatori where a CID may be available; CARv2 says
+where inside an object a block's bytes begin; Ayatori weaves those inputs into
+a queryable projection. These are separate effects: an IPNI provider result is
+not proof that content was retrieved or CID-verified, a CARv2 index entry is
+not proof that the frame it points at hashes to the CID it claims, and none of
+them is proof that a query was evaluated.
 
 Current implemented surfaces:
 
@@ -91,6 +93,72 @@ CID verification now preserves the codec declared by the requested CID and
 checks its SHA-256 multihash. Persistent Arrangement snapshots remain
 DAG-CBOR, while the transport/verification seam can also validate real raw or
 DAG-PB provider responses before a higher layer decides how to decode them.
+
+## `ayatori.pack` — CARv2 packs, and why the layout has to be declared
+
+`ayatori.remote` fetches one block per request. That is correct, and it is one
+network round trip per block. The novelty chain it hydrates is a cons chain of
+width 1 (ADR-2608021000), so those round trips are strictly sequential and
+cannot be prefetched away — the cost is structural, not a tuning problem.
+
+A CARv2 pack removes the network's half of it. Blocks written together live in
+one archive, so one HTTP `Range` read serves a block that would otherwise have
+been its own request. The chain stays logically sequential; only the transport
+stops being.
+
+```clojure
+(require '[ayatori.pack :as pack] '[ayatori.remote :as remote])
+
+(def p (pack/open-pack {:range-fn my-range-reader          ; (fn [{:keys [range]}] -> bytes)
+                        :profile  {:blocks :packed-blocks
+                                   :object #{:range-read}}}))
+
+(def getter (remote/provider-block-getter
+             {:discover-fn my-discover-fn
+              :fetch-fn    (pack/pack-fetcher p)}))        ; drop-in fetch-fn
+```
+
+`pack-fetcher` has the same shape as the per-object fetcher, so the verified
+getter's CID rehash, provider fallback and memo are unchanged.
+
+### There is no default block layout, and `:packed-blocks` needs `:range-read`
+
+Per ADR-2608160100, a backend declares one of:
+
+| layout | meaning |
+|---|---|
+| `:block-per-object` | one CID, one object — the existing path |
+| `:packed-blocks` | many CIDs inside one object, addressed by range |
+
+`:packed-blocks` is **refused** unless the object plane also declares
+`:range-read`, and that refusal is the point of this namespace rather than a
+detail of it. Without `Range`, a packed reader still returns *correct bytes* —
+it GETs the whole archive and picks one frame out of it. Round trips go down.
+Every assertion about correctness passes. Only transfer explodes. It is a
+success that reads as a success, so nothing downstream can catch it; it has to
+be refused at the only place that knows both halves. The profile is checked
+before any request is issued.
+
+### Costs, in round trips
+
+Round trips rather than wall clock: this repo is developed on a machine
+running many agents at once, so a timing figure describes the machine.
+
+| | range reads |
+|---|---|
+| open a pack | 2 — header, then index — regardless of block count |
+| read N blocks | N |
+| block not in the pack | 0, and `nil` rather than a throw, so the caller can fall back to the per-object path |
+| re-read through the getter | 0 (the getter's memo) |
+
+A pack with no index is refused: without one, locating a block means reading
+the whole payload, which is the cost this exists to avoid.
+
+The CARv2 codec itself is `kotoba-lang/io-ipld-car`. This namespace reads packs
+and never writes them — a second encoder is how the `:file-offset` versus
+`:payload-offset` convention drifts, which is the one bug this format reliably
+produces. CID verification stays in `read-frame`, which checks every frame it
+parses.
 
 ## Public network benchmark
 
