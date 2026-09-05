@@ -378,18 +378,66 @@
                                :cid cid :attempts failures}))))))))))
 
 #?(:cljs
+   (defn- attempt-providers-async
+     "Try `providers` in order under `:fetch-fn`, verifying every candidate.
+     Returns a Promise of verified bytes or rejects with
+     :ayatori/all-providers-failed. Extracted so the block-source fall-through
+     and the plain discovery path share ONE provider loop (iteration 02)."
+     [{:keys [cid providers fetch-fn stats block-memo]}]
+     (let [attempt
+           (fn attempt [remaining failures]
+             (if-let [provider (first remaining)]
+               (do
+                 (swap! stats update :fetch-attempts inc)
+                 (-> (js/Promise.resolve (fetch-fn provider cid))
+                     (.then (fn [bytes]
+                              (if-not bytes
+                                (throw (ex-info "missing block" {:type :missing}))
+                                (verify-block! cid bytes))))
+                     (.then (fn [verified]
+                              (swap! block-memo assoc cid verified)
+                              (swap! stats
+                                     (fn [s]
+                                       (-> s
+                                           (update :verified-blocks inc)
+                                           (update :verified-bytes +
+                                                   (byte-count verified)))))
+                              verified))
+                     (.catch (fn [e]
+                               (swap! stats update :provider-failures inc)
+                               (attempt (next remaining)
+                                        (conj failures
+                                              (failure provider
+                                                       (or (:type (ex-data e))
+                                                           :transport-error)
+                                                       (message e))))))))
+               (js/Promise.reject
+                (ex-info "ayatori: no provider returned a verified block"
+                         {:type :ayatori/all-providers-failed
+                          :cid cid :attempts failures}))))]
+       (attempt providers []))))
+#?(:cljs
    (defn provider-block-getter-async
      "Worker-native `(fn [cid] -> Promise<verified-bytes>)` getter.
 
      Discovery and provider retrieval may reject or return Promises. Providers
      are tried in discovery order; only bytes whose SHA-256 multihash matches
      the requested CID are memoised. The memo stores resolved verified bytes,
-     never a rejected Promise or an unverified response."
-     ;; NOTE: `:block-source` is threaded through the synchronous getter only.
-     ;; The Worker-native path would need the source's result awaited and
-     ;; coalesced with `:in-flight`, which is a different piece of work; until
-     ;; then a Worker pays discovery per block even behind a pack.
-     [{:keys [discover-fn fetch-fn stats block-memo in-flight]}]
+     never a rejected Promise or an unverified response.
+
+     `:block-source` is optional: `(fn [cid] -> bytes-or-nil-or-Promise)`,
+     tried BEFORE discovery and awaited if it returns a Promise. Its bytes are
+     verified on the same path as a provider's -- being local is not being
+     trusted. A source that answers with the wrong bytes, rejects, or resolves
+     nil is SKIPPED the way a mismatching provider is, but counted as
+     :source-failures so a corrupt pack is visible rather than merely slow.
+     The source call participates in the same `:in-flight` coalescing as a
+     provider miss: concurrent callers for one CID share one source attempt.
+     Absent `:block-source`, behaviour is unchanged."
+     [{:keys [discover-fn fetch-fn stats block-memo in-flight block-source]}]
+     (when (and (some? block-source) (not (fn? block-source)))
+       (throw (ex-info "ayatori: block-source must be a function of one CID"
+                       {:type :ayatori/invalid-block-source})))
      (let [stats (stats-atom stats)
            block-memo (or block-memo (atom {}))
            in-flight (or in-flight (atom {}))]
@@ -402,47 +450,52 @@
              (if-let [pending (get @in-flight cid)]
                (do (swap! stats update :in-flight-hits inc) pending)
                (let [request
-                     (-> (do (swap! stats update :discoveries inc)
-                             (js/Promise.resolve (discover-fn cid)))
-                         (.then (fn [result]
-                                  (let [providers (validate-discovery! cid result)]
-                                    (letfn [(attempt [remaining failures]
-                                              (if-let [provider (first remaining)]
-                                                (do
-                                                  (swap! stats update :fetch-attempts inc)
-                                                  (-> (js/Promise.resolve (fetch-fn provider cid))
-                                                      (.then (fn [bytes]
-                                                               (if-not bytes
-                                                                 (throw (ex-info "missing block" {:type :missing}))
-                                                                 (verify-block! cid bytes))))
-                                                      (.then (fn [verified]
-                                                               (swap! block-memo assoc cid verified)
-                                                               (swap! stats
-                                                                      (fn [s]
-                                                                        (-> s
-                                                                            (update :verified-blocks inc)
-                                                                            (update :verified-bytes +
-                                                                                    (byte-count verified)))))
-                                                               verified))
-                                                      (.catch (fn [e]
-                                                                (swap! stats update :provider-failures inc)
-                                                                (attempt (next remaining)
-                                                                         (conj failures
-                                                                               (failure provider
-                                                                                        (or (:type (ex-data e))
-                                                                                            :transport-error)
-                                                                                        (message e))))))))
-                                                (js/Promise.reject
-                                                 (ex-info "ayatori: no provider returned a verified block"
-                                                          {:type :ayatori/all-providers-failed
-                                                           :cid cid :attempts failures}))))]
-                                      (attempt providers [])))))
-                         (.catch (fn [e]
-                                   (if (= :ayatori/all-providers-failed (:type (ex-data e)))
-                                     (throw e)
-                                     (throw (ex-info "ayatori: provider discovery failed"
-                                                     {:type :ayatori/discovery-failed
-                                                      :cid cid :detail (message e)} e))))))
+                     (if block-source
+                       (-> (do (swap! stats update :source-attempts inc)
+                               (js/Promise.resolve (block-source cid)))
+                           (.then (fn [bytes]
+                                    (if-not bytes
+                                      (do (swap! stats update :source-failures inc)
+                                          ;; fall through to discovery: a nil
+                                          ;; source is "not in hand", not an
+                                          ;; error. Reuse the provider path.
+                                          (-> (do (swap! stats update :discoveries inc)
+                                                  (js/Promise.resolve (discover-fn cid)))
+                                              (.then (fn [result]
+                                                       (let [providers (validate-discovery! cid result)]
+                                                         (attempt-providers-async
+                                                          {:cid cid :providers providers
+                                                           :fetch-fn fetch-fn :stats stats
+                                                           :block-memo block-memo})))))))
+                                      (try
+                                        (let [verified (verify-block! cid bytes)]
+                                          (swap! block-memo assoc cid verified)
+                                          (swap! stats
+                                                 (fn [s]
+                                                   (-> s
+                                                       (update :source-hits inc)
+                                                       (update :verified-blocks inc)
+                                                       (update :verified-bytes + (byte-count verified)))))
+                                          verified)
+                                        (catch :default e
+                                          (swap! stats update :source-failures inc)
+                                          ;; corrupt source: same fall-through.
+                                          (-> (do (swap! stats update :discoveries inc)
+                                                  (js/Promise.resolve (discover-fn cid)))
+                                              (.then (fn [result]
+                                                       (let [providers (validate-discovery! cid result)]
+                                                         (attempt-providers-async
+                                                          {:cid cid :providers providers
+                                                           :fetch-fn fetch-fn :stats stats
+                                                           :block-memo block-memo}))))))))))
+                       (-> (do (swap! stats update :discoveries inc)
+                               (js/Promise.resolve (discover-fn cid)))
+                           (.then (fn [result]
+                                    (let [providers (validate-discovery! cid result)]
+                                      (attempt-providers-async
+                                       {:cid cid :providers providers
+                                        :fetch-fn fetch-fn :stats stats
+                                        :block-memo block-memo}))))))
                      settled (-> request
                                  (.then (fn [verified]
                                           (swap! in-flight dissoc cid)
@@ -519,9 +572,16 @@
 
      Required effects are Promise-capable `:fetch-fn`, `:blind-fn`, and
      `:decrypt-fn`, plus either Promise-capable `:discover-fn` or `:http-fn`
-     (composed through `ayatori.discovery/find-providers-async`)."
+     (composed through `ayatori.discovery/find-providers-async`).
+
+     `:block-source` is optional and has the same contract as in
+     `open-snapshot`: `(fn [cid] -> bytes-or-nil-or-Promise)`, tried before
+     discovery, awaited, verified like a provider's bytes, and coalesced
+     through `:in-flight`. A Worker serving a pack therefore pays zero
+     discoveries for blocks the pack holds."
      [{:keys [snapshot-cid discover-fn http-fn discovery-opts fetch-fn
-              blind-fn decrypt-fn partitions stats block-memo in-flight]}]
+              blind-fn decrypt-fn partitions stats block-memo in-flight
+              block-source]}]
      (try
        (validate-cid! snapshot-cid)
        (when-not (fn? blind-fn)
@@ -541,7 +601,8 @@
              get-block (provider-block-getter-async
                         {:discover-fn discover-fn :fetch-fn fetch-fn
                          :stats stats :block-memo block-memo
-                         :in-flight in-flight})]
+                         :in-flight in-flight
+                         :block-source block-source})]
          (-> (arrangement-source/cursor-async get-block snapshot-cid
                                                blind-fn decrypt-fn partitions)
              (.then (fn [source]
