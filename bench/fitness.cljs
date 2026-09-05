@@ -128,6 +128,47 @@
      :discoveries @discoveries :reads @range-reads :bytes @bytes
      :archive-bytes (b/bcount archive)}))
 
+(defn- packed-arm-async
+  "The SAME pack through open-snapshot-async (Worker-native path).
+  Iteration 02 seed: before the async getter took :block-source, a Worker
+  behind a pack paid discovery per block. This arm is the measured answer."
+  [{:keys [blocks snapshot-cid]}]
+  (let [entries (mapv (fn [[cid bytes]] {:cid cid :bytes bytes}) @blocks)
+        archive (:bytes (car2/pack {:roots [snapshot-cid] :blocks entries}))
+        range-reads (atom 0) bytes (atom 0)
+        range-fn (fn [{:keys [range]}]
+                   (swap! range-reads inc)
+                   (let [[_ from to] (re-matches #"bytes=(\d+)-(\d*)" range)
+                         start (js/parseInt from 10)
+                         total (b/bcount archive)
+                         end (if (seq to) (min total (inc (js/parseInt to 10))) total)
+                         slice (b/slice archive start (min end total))]
+                     (swap! bytes + (b/bcount slice))
+                     slice))
+        p (pack/open-pack {:range-fn range-fn
+                           :profile {:blocks :packed-blocks
+                                     :object #{:range-read}}})
+        discoveries (atom 0)]
+    (-> (remote/open-snapshot-async
+         {:snapshot-cid snapshot-cid
+          :discover-fn (fn [cid]
+                         (swap! discoveries inc)
+                         (js/Promise.resolve
+                          {:ok? true :cid cid :mutates-cid? false
+                           :providers [{:plane :discovery :cid cid :peer "p"
+                                        :addrs [] :mutates-cid? false}]}))
+          :fetch-fn (fn [_ _] (js/Promise.resolve nil))
+          :block-source #(js/Promise.resolve (pack/read-block p %))
+          :blind-fn blind-async :decrypt-fn crypto-async})
+        (.then (fn [opened]
+                 (-> (remote/q-async opened query (constantly true))
+                     (.then (fn [rows]
+                              {:arm "packed-async" :rows (count rows)
+                               :round-trips @range-reads
+                               :discoveries @discoveries
+                               :reads @range-reads :bytes @bytes
+                               :archive-bytes (b/bcount archive)}))))))))
+
 (defn- fmt [& xs] (str/join (map (fn [[w v]] (.padStart (str v) w)) (partition 2 xs))))
 
 (defn -main []
@@ -138,15 +179,17 @@
   (println (fmt 7 "subj" 8 "quads" 8 "blocks" 6 "rows"
                 14 "|  per-object" 8 "disc" 7 "read" 10 "bytes"
                 12 "|  packed" 8 "disc" 7 "read" 10 "bytes"))
-  (println (str/join (repeat 112 "-")))
+  (println (str/join (repeat 140 "-")))
   (-> (reduce
        (fn [pr n]
          (.then pr (fn [acc]
                      (.then (build (corpus n 3))
                             (fn [snap]
+                              (.then (packed-arm-async snap)
+                                     (fn [c]
                               (let [a (per-object-arm snap)
                                     b (packed-arm snap)]
-                                (when-not (= (:rows a) (:rows b) 3)
+                                (when-not (= (:rows a) (:rows b) 3 (:rows c))
                                   (println "REFUSING: the two arms did not return"
                                            "the same 3 rows:" (:rows a) "vs" (:rows b))
                                   (js/process.exit 2))
@@ -156,18 +199,18 @@
                                               7 (:reads a) 10 (:bytes a)
                                               12 (:round-trips b) 8 (:discoveries b)
                                               7 (:reads b) 10 (:bytes b)))
-                                (conj acc [n a b])))))))
+                                (conj acc [n a b c])))))))))
        (js/Promise.resolve [])
        [50 100 200 400 800])
       (.then (fn [rs]
                (println)
-               (let [[n0 a0 _] (first rs) [n1 a1 b1] (last rs)]
+               (let [[n0 a0 _] (first rs) [n1 a1 b1 c1] (last rs)]
                  (println (str "scaling: database grew " (/ (* 2 n1) (* 2 n0)) "x, "
                                "per-object round trips grew "
                                (.toFixed (/ (:round-trips a1) (double (:round-trips a0))) 2) "x"))
                  (println (str "transport: at " n1 " subjects, per-object "
                                (:round-trips a1) " round trips vs packed "
-                               (:round-trips b1) " -- "
+                               (:round-trips b1) " (sync) / " (:round-trips c1) " (async) -- "
                                (.toFixed (/ (:round-trips a1) (double (:round-trips b1))) 2) "x")))
                (when (zero? (:round-trips (second (first rs))))
                  (println "REFUSING: zero round trips at the smallest size")
