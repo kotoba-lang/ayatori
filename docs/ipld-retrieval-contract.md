@@ -1,7 +1,7 @@
 # IPLD retrieval contract
 
 Status: Proposed extension of the existing CARv2 reader, not a Selector-engine
-implementation. See [Kotobase ADR-2609060000](https://github.com/kotoba-lang/kotobase/blob/agent/ipld-adl-carv2-selector-20260906/docs/adr/2609060000-ipld-adl-selector-car-boundaries.md).
+implementation. See [Kotobase ADR-2609060000](https://github.com/kotoba-lang/kotobase/blob/178711d107154db5cf00a3bf7c24f79ed854f08a/docs/adr/2609060000-ipld-adl-selector-car-boundaries.md).
 
 ## Existing implementation
 
@@ -14,11 +14,16 @@ the CAR index locates candidate frames. Neither establishes graph truth.
 The current index-derived `:frame-length` is a read bound, not universally an
 exact frame size. It is exact only when every frame boundary is represented
 once and frames are contiguous. Sparse indexes (including omitted identity
-sections) can over-fetch. Duplicate offsets can yield zero-length bounds.
-Current lookup compares digest bytes before checking the returned full CID;
-mixed hash algorithms or codec aliases can therefore cause failed retrieval
-even where a suitable frame exists. Do not claim arbitrary-CAR compatibility
-or exact-byte reads on these cases before dedicated fixtures and fixes land.
+sections) can over-fetch. Repeated offsets now share the next distinct boundary.
+Header arithmetic and index offsets are checked before block reads. Candidate
+lookup matches both hash code and digest; `read-block` tries distinct candidate
+offsets until the full CID matches, preserving verification of each parsed frame.
+Even an overlong provider response cannot extend a frame past its read bound.
+
+This does not claim arbitrary-CAR support: the codec remains CIDv1 and
+MultihashIndexSorted only, with its existing supported hash algorithms. Index
+size/work limits and verification of CARv1 header structure during `open-pack`
+remain separate work. Sparse reads remain bounds rather than exact lengths.
 
 ## Proposed selective hydration
 
@@ -50,9 +55,10 @@ support merely because the response is a CAR.
 
 Keep existing write-local packs. Evaluate traversal-order exports separately
 with request-count, byte-count, memory, and latency evidence. Coalescing must
-preserve per-frame full-CID verification. Before broadening compatibility, test
-sparse/duplicate indexes, multiple hash algorithms, codec aliases, padded payload
-offsets, truncated varints/frames, and payload-end bounds. Selector work then
+preserve per-frame full-CID verification. `pack-bounds-test` covers
+sparse/duplicate indexes, hash-code candidate filtering, codec aliases, padded
+payload/index offsets, truncated/corrupt frames, and payload-end bounds. These
+tests do not add support for new hash algorithms. Selector work then
 needs missing-block, shared-DAG, unsupported-ADL, and budget-exhaustion fixtures.
 
 References: [CARv2](https://ipld.io/specs/transport/car/carv2/) and
