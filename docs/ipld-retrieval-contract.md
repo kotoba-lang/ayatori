@@ -20,9 +20,38 @@ offsets until the full CID matches, preserving verification of each parsed frame
 Even an overlong provider response cannot extend a frame past its read bound.
 
 This does not claim arbitrary-CAR support: the codec remains CIDv1 and
-MultihashIndexSorted only, with its existing supported hash algorithms. Index
-size/work limits and verification of CARv1 header structure during `open-pack`
-remain separate work. Sparse reads remain bounds rather than exact lengths.
+MultihashIndexSorted only, with its existing supported hash algorithms. Sparse
+reads remain bounds rather than exact lengths.
+
+## Index and header limits (landed 2026-09-06)
+
+Index size/work limits and header qualification are no longer separate work.
+
+The index read is bounded rather than open-ended. It was `bytes=N-` -- the rest
+of the object, whatever that was -- so the reader learned the size by already
+holding it, and a large tail or a store that ignores `Range` was an unbounded
+read nothing downstream could undo. `max-index-bytes` (8 MiB, about 200k
+records at 40 bytes each) is a ceiling the reader chooses; a caller packing
+larger passes its own. Because asking for a window is not the same as being
+given one, an oversized response is refused as well as bounded.
+
+The whole header is qualified, not only the parts this reader uses. CARv2 gives
+an archive a 128-bit characteristics bitfield to say it is not an ordinary one,
+and this reader implements no characteristic. Parsed and discarded, saying so
+and saying nothing produced the same read; a declared characteristic is now
+refused on the header read, before the index is fetched.
+
+Truncation is refused by the codec rather than here. `io-ipld-car` checks each
+declared count against the bytes remaining and takes a `:max-records` ceiling,
+because a large *well-formed* index is still an unbounded allocation for a
+reader that cannot see its size until it holds it. Its failures are typed apart
+so a short buffer cannot decode as an empty index -- nothing here can tell that
+apart from a pack that genuinely indexes no blocks.
+
+That refusal replaced a non-termination, not a mis-parse: measured on nbb, an
+index header claiming one code group and carrying none of it spun without
+yielding, because an out-of-range read returned `NaN` and `NaN` compares false
+against every guard. In a Worker that is the isolate, not a slow request.
 
 ## Proposed selective hydration
 
@@ -56,7 +85,9 @@ Keep existing write-local packs. Evaluate traversal-order exports separately
 with request-count, byte-count, memory, and latency evidence. Coalescing must
 preserve per-frame full-CID verification. `pack-bounds-test` covers
 sparse/duplicate indexes, hash-code candidate filtering, codec aliases, padded
-payload/index offsets, truncated/corrupt frames, and payload-end bounds. These
+payload/index offsets, truncated/corrupt frames, and payload-end bounds;
+`pack-limits-test` covers the bounded index request, a caller-set ceiling, an
+oversized response, a truncated index, and a declared characteristic. These
 tests do not add support for new hash algorithms. Selector work then
 needs missing-block, shared-DAG, unsupported-ADL, and budget-exhaustion fixtures.
 
