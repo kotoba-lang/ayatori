@@ -26,11 +26,52 @@ and refuses Promise ports. Existing query visibility and governed execution
 remain required; this adapter does not add permissions to a query.
 
 The wire contract and provider obligations live in
-[`kotobase/docs/disclosure-grants.edn`](https://github.com/kotoba-lang/kotobase/blob/feat/recipient-disclosure-grants/docs/disclosure-grants.edn).
+[`kotobase/docs/disclosure-grants.edn`](https://github.com/kotoba-lang/kotobase/blob/main/docs/disclosure-grants.edn).
 The key envelope must stay behind the service until its delivery event is
 durable. Publishing it in advance defeats delivery auditing. Recipient-specific
 grant CIDs identify distribution paths, not different identities for identical
 decrypted bytes. Scope is an exact ciphertext object in this first profile.
+
+### `ayatori.disclosure-open` — the `:open!` port, with a real key in it
+
+`:open!` is the one place where a real secret key touches a real ciphertext,
+so `ayatori.disclosure` leaves it to the host. What was missing was not the
+port but anything to put in it: every test until now handed it a closure that
+already held the content key, which proves the delivery protocol and proves
+nothing about the delivery of a key.
+
+```clojure
+(require '[ayatori.disclosure-open :as open])
+
+(def opener
+  (open/recipient-opener
+   {:keys!         resolve-my-secret-keys-for-this-fingerprint
+    :open-content! decrypt-the-object-under-its-content-key}))
+```
+
+It still owns no keys and no ciphertext framing — both stay ports, because
+where a recipient's X25519 and ML-KEM secret keys live is a deployment
+decision and how the object is framed under its content key travels with the
+ciphertext. What it owns is the step between them: the wrapped key arrives as
+the octet vector `:sealed/ciphertext`, is opened by
+[`kotoba-lang/envelope`](https://github.com/kotoba-lang/envelope)'s
+hybrid X25519 + ML-KEM-768 provider with `binding(grant)` as the
+authenticated context, and the recovered key reaches `:open-content!` and
+nothing else — never returned, never logged, overwritten once the content is
+out.
+
+`:keys!` must return a map whose `:recipient-key` is the fingerprint it was
+asked for. A custody store that hands back a different key is refused there,
+by name, rather than four steps later as an AEAD failure indistinguishable
+from forgery. An absent or empty `binding` is refused rather than used: that
+is not a weaker binding but none, and the wrap would open under any grant
+producing the same envelope.
+
+The provider under this port is qualified — `envelope.qualify` runs the
+deployed ML-KEM module against known answers BouncyCastle generated and hands
+the evidence to `kotoba.security.crypto-policy/evaluate-pq-provider`. Key
+custody is not: `:keys!` is where that gap lives, and it is a port precisely
+so it is visible.
 
 [![CI](https://github.com/kotoba-lang/ayatori/actions/workflows/ci.yml/badge.svg)](https://github.com/kotoba-lang/ayatori/actions/workflows/ci.yml)
 
@@ -609,29 +650,37 @@ retired") and `arrangement`'s own README / ADR-2607050700 for the merge.
 First-class runtime is **nbb/cljs** (repo-wide runtime priority):
 
 ```bash
-git clone https://github.com/kotoba-lang/kotobase .deps/kotobase
-git clone https://github.com/kotoba-lang/arrangement .deps/arrangement
-git clone https://github.com/kotoba-lang/prolly-tree .deps/prolly-tree
-git clone https://github.com/kotoba-lang/io-ipld .deps/io-ipld
-git clone https://github.com/kotoba-lang/io-ipld-car .deps/io-ipld-car
-git clone https://github.com/kotoba-lang/io-multiformats .deps/io-multiformats
-git clone https://github.com/kotoba-lang/org-ietf-cbor .deps/org-ietf-cbor
-git clone https://github.com/kotoba-lang/dev-protobuf .deps/dev-protobuf
-git clone https://github.com/kotoba-lang/datom-source .deps/datom-source
-git clone https://github.com/kotoba-lang/datalog .deps/datalog
-git clone https://github.com/kotoba-lang/io-ipni-specs .deps/io-ipni-specs
-git clone https://github.com/kotoba-lang/org-nist-sha2 .deps/org-nist-sha2
-nbb --classpath "src:test:.deps/kotobase/src:.deps/security/src:.deps/arrangement/src:.deps/prolly-tree/src:.deps/io-ipld/src:.deps/io-ipld-car/src:.deps/io-multiformats/src:.deps/org-ietf-cbor/src:.deps/dev-protobuf/src:.deps/datom-source/src:.deps/datalog/src:.deps/io-ipni-specs/src:.deps/org-nist-sha2/src" bin/run_tests.cljs
+for repo in kotobase security arrangement prolly-tree io-ipld io-ipld-car \
+            io-multiformats org-ietf-cbor dev-protobuf datom-source datalog \
+            block-cache io-ipni-specs org-nist-sha2 envelope org-signal; do
+  git clone "https://github.com/kotoba-lang/$repo" ".deps/$repo"
+done
+npm install
+nbb --classpath "$(cat bin/classpath.txt)" bin/run_tests.cljs
 ```
 
-Each `.deps/<name>` should be checked out at the SHA pinned in `deps.edn`
-(`kotobase`, `arrangement`, `io-ipld`, `io-multiformats`, `io-ipni-specs`) or in the dependency
-repos' own `deps.edn` transitively (`prolly-tree`,
-`org-ietf-cbor`, `dev-protobuf`, `datom-source`, `datalog`, and `org-nist-sha2`
-— which io-multiformats requires as `sha2.core`, and whose absence made every
+The classpath is in `bin/classpath.txt` so there is one of it. Check each
+`.deps/<name>` out at its pinned SHA: the direct ones are in `deps.edn`
+(`kotobase`, `arrangement`, `io-ipld`, `io-ipld-car`, `io-multiformats`,
+`io-ipni-specs`, `envelope`) and the rest are named by the `deps.edn` of the
+repo that depends on them — `kotobase` → `security`; `arrangement` →
+`prolly-tree`, `io-ipld`, `datom-source`, `datalog`, `block-cache`; `io-ipld`
+→ `io-multiformats`, `org-ietf-cbor`, `dev-protobuf`; `io-multiformats` →
+`org-nist-sha2` (required as `sha2.core`, and its absence made every
 documented reproduction of this suite die before the first test until
-2026-09-04) — CI pins every one of them, see
-`.github/workflows/ci.yml`.
+2026-09-04); `envelope` → `org-signal`.
+
+⚠ `.github/workflows/ci.yml` holds a second hand-copied set of those SHAs and
+says it is kept in lockstep with `deps.edn`. Measured 2026-09-06 it is not,
+and one of the skews — `io-multiformats` at `b3b157e6` instead of `561fe7df`
+— stops the suite before a single test runs. The file is inert (Actions are
+disabled fleet-wide and are not the CI authority, ADR-2607300900), so it is
+left alone rather than kept up; read the pins from `deps.edn`.
+
+Measured 2026-09-06 on nbb 1.5.212 / Node 26.7.0: **131 tests, 399
+assertions, 0 failures, 0 errors**, including real AES-GCM content through a
+verified remote cursor and a real hybrid-KEM-wrapped content key delivered
+through `ayatori.disclosure-open`.
 
 The `:test` alias in `deps.edn` is the JVM **compat** suite only (`clojure
 -M:test`, via `tools.deps` transitive git-dep resolution — no manual

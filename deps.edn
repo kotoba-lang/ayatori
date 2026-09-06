@@ -40,9 +40,24 @@
         io.github.kotoba-lang/io-multiformats
         {:git/sha "561fe7dfada3db852b127f06d41750dabd3cead9"}
         io.github.kotoba-lang/io-ipni-specs
-        {:git/sha "2c1559e2703bf41076188539c7086255b0d3c540"}}
+        {:git/sha "2c1559e2703bf41076188539c7086255b0d3c540"}
+        ;; `ayatori.disclosure-open` builds the `:open!` port on
+        ;; `envelope.sealed-key`: the hybrid X25519 + ML-KEM-768 wrap of one
+        ;; content key, framed as the octet vector a grant's
+        ;; `:sealed/ciphertext` carries. Direct, not transitive through
+        ;; kotobase, because kotobase deliberately holds no crypto -- the
+        ;; provider is the host's, and here the host is this repo.
+        ;;
+        ;; Pinned to the commit whose `envelope.qualify` binds the ML-KEM
+        ;; module digest that `kotoba.security.crypto-policy/
+        ;; evaluate-pq-provider` was run against. Moving this pin without
+        ;; re-running `npm run qualify:ml-kem` in that repo means the
+        ;; provider under this port is no longer the qualified one.
+        io.github.kotoba-lang/envelope
+        {:git/url "https://github.com/kotoba-lang/envelope.git"
+         :git/sha "802716de868d8e13719b3e62e49c42649e8a5557"}}
  ;; First-class runtime is nbb/cljs (repo-wide runtime priority):
- ;;   nbb --classpath "src:test:.deps/kotobase/src:.deps/arrangement/src:.deps/prolly-tree/src:.deps/io-ipld/src:.deps/io-multiformats/src:.deps/org-ietf-cbor/src:.deps/dev-protobuf/src:.deps/datom-source/src:.deps/datalog/src:.deps/io-ipni-specs/src" bin/run_tests.cljs
+ ;; the exact classpath lives in bin/run_tests.cljs, which is the runner.
  ;; The :test alias below is the :clj COMPAT suite only -- not the
  ;; primary execution path.
  :aliases
