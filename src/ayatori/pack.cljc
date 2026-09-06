@@ -95,7 +95,7 @@
   profile)
 
 (defn- bounded-index
-  "The index records with a frame length attached to each.
+  "The index records with an index-derived read bound attached to each.
 
   `ipld.car.v2/locate` returns only `:file-offset`, and says why: the CARv2
   index stores where a frame starts and not how long it is, so a reader
@@ -105,10 +105,11 @@
   every block was requested as 64 KiB regardless of its real size. Round
   trips went down and transfer went UP.
 
-  Reading to the next record needs no extra fetch: sort the records by
-  payload offset, and each frame ends where the next one begins. The last
-  one ends at the end of the CARv1 payload, which the header already gives
-  as `:data-size`. The result is an exact upper bound on every frame."
+  Reading to the next distinct record needs no extra fetch. The bound is
+  exact only with complete, contiguous frame coverage; sparse indexes can
+  include additional sections in the read. The final bound uses :data-size.
+  Duplicate offsets are not normalized here and can yield zero-length bounds.
+  See docs/ipld-retrieval-contract.md for compatibility gates."
   [{:keys [data-offset data-size]} index]
   (let [sorted (vec (sort-by :payload-offset index))
         end (+ data-offset data-size)]
@@ -165,7 +166,7 @@
        :fetch fetch})))
 
 (defn locate
-  "Where `cid` starts in this pack and how long its frame is, or nil when the
+  "Where `cid` starts in this pack and its read bound, or nil when the
   pack does not carry it.
 
   Unlike `ipld.car.v2/locate` this returns `:frame-length` too, derived from
@@ -185,8 +186,8 @@
   [{:keys [fetch read-ahead] :as pack} cid]
   (when-let [loc (locate pack cid)]
     (let [body (fetch (if-let [len (:frame-length loc)]
-                        ;; exact: the index's neighbours bound the frame, so
-                        ;; nothing is over-fetched
+                        ;; Index neighbours bound the read; sparse indexes
+                        ;; may include additional frames in this range.
                         (car2/range-header (assoc loc :frame-length len))
                         ;; a pack whose index gave no neighbour to bound
                         ;; against still works, by over-fetching
