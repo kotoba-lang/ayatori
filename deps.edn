@@ -25,11 +25,11 @@
  ;; src dir on --classpath by hand -- see the README's Develop/test section
  ;; for the exact command.
  :deps {io.github.kotoba-lang/kotobase
-        {:git/sha "bbf57df9dde5c1869182012860129a598382e088"}
+        {:git/sha "8484ed8f0102db81e020e4b5fa401d3e47f3caca"}
         io.github.kotoba-lang/arrangement
         {:git/sha "9c9f45d4cd043873cd5c5ea65fa3af8a8ead5e6d"}
         io.github.kotoba-lang/io-ipld
-        {:git/sha "f99bf27d58a75bb8cf6ddfd2d57a0aaac9c824ac"}
+        {:git/sha "48ba40490cf082a1473986ac757b8e2b214a3d1b"}
         io.github.kotoba-lang/io-ipld-car
         {:git/sha "5817936ddfc3d3f4b3283762f09c9d0db42c8dce"}
         io.github.kotoba-lang/io-multiformats
