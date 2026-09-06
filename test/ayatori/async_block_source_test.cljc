@@ -5,6 +5,7 @@
   (:require [arrangement.core :as arr]
             [ayatori.remote :as remote]
             [clojure.test :as t :refer [deftest is]]
+            [ipld.core :as ipld]
             ;; `async` is a cljs.test macro; `clojure.test` has no such var, so
             ;; referring it unconditionally makes this namespace fail to LOAD on
             ;; the JVM -- before any test runs, and before the `#?(:clj)` body
@@ -107,6 +108,168 @@
                                    (done))))))
              (.catch (fn [e]
                        (is false (str "corrupt-source test threw: " e))
+                       (done))))))))
+
+;; ---------------------------------------- what a source MISS costs, in round trips
+
+#?(:cljs
+   (defn- counting-getter
+     "The async getter with `discover-fn` and `fetch-fn` wrapped in counters.
+
+     Round trips, not wall clock: this machine runs many agents at once and a
+     stopwatch here describes the machine. `stats` records what the getter
+     believes it did; the two atoms record what it actually asked for, and a
+     test that only read `stats` would have believed the arithmetic instead of
+     the calls."
+     [{:keys [block-source served discoveries fetches]}]
+     (remote/provider-block-getter-async
+      {:discover-fn (fn [cid]
+                      (swap! discoveries inc)
+                      (js/Promise.resolve
+                       {:ok? true :cid cid :mutates-cid? false
+                        :providers [{:plane :discovery :cid cid :peer "p"
+                                     :addrs [] :mutates-cid? false}]}))
+       :fetch-fn (fn [_ cid]
+                   (swap! fetches inc)
+                   (js/Promise.resolve (get served cid)))
+       :block-source block-source
+       :stats (:stats (meta block-source))})))
+
+#?(:cljs
+   (defn- refusal-type
+     "The `:type` a rejection carries, from under whatever wrapped it.
+
+     Measured 2026-09-06 on UNMODIFIED main, on the path with no
+     `:block-source` at all: nbb's sci re-wraps the `(throw e)` in the
+     getter's `:in-flight` cleanup handler, so `ex-data` on what a caller
+     awaits reads `:sci/error` and the ayatori type is one `ex-cause` down.
+     Asserting on the outer type alone would pass for a rejection that was
+     not the one meant."
+     [e]
+     (loop [e e]
+       (when e
+         (let [t (:type (ex-data e))]
+           (if (and t (not= :sci/error t)) t (recur (ex-cause e))))))))
+
+#?(:cljs
+   (deftest worker-native-source-miss-costs-exactly-one-discovery
+     ;; The sync getter answers a source that does not carry the block with
+     ;; ONE discovery and ZERO :source-failures -- "not in hand" is not a
+     ;; failure (pack_test's a-source-that-does-not-have-the-block-falls-
+     ;; through-to-providers). Measured on the async getter before this
+     ;; change: TWO discoveries and TWO fetches per block, and two
+     ;; :source-failures.
+     ;;
+     ;; A paren closed the `if-not` early, so the nil branch was no longer a
+     ;; branch: it ran discovery for effect, threw the Promise away, and then
+     ;; fell into `verify-block!` with nil bytes, which rejected and bought a
+     ;; second discovery. A Worker behind a half-full pack paid DOUBLE the
+     ;; round trips of a Worker passing no source at all -- and the option
+     ;; exists to remove round trips.
+     (async done
+       (let [wanted (mapv #(ipld/node->block {"n" %}) (range 4))
+             served (into {} (map (juxt :cid :bytes)) wanted)
+             discoveries (atom 0)
+             fetches (atom 0)
+             stats (atom {})
+             source (with-meta (fn [_cid] (js/Promise.resolve nil))
+                      {:stats stats})
+             getter (counting-getter {:block-source source :served served
+                                      :discoveries discoveries :fetches fetches})]
+         (-> (js/Promise.all (mapv #(getter (:cid %)) wanted))
+             (.then (fn [_]
+                      (is (= 4 @discoveries)
+                          "one discovery per block the source did not carry, not two")
+                      (is (= 4 @fetches)
+                          "one fetch per block, not two")
+                      (is (= 4 (:discoveries @stats))
+                          "and stats agrees with the calls actually made")
+                      (is (zero? (:source-failures @stats))
+                          "a source that does not carry the block has not FAILED -- counting
+                           it makes a pack legitimately holding half the blocks look
+                           identical to a corrupt one")
+                      (is (= 4 (:source-attempts @stats))
+                          "the source was still asked, once per block")
+                      (done)))
+             (.catch (fn [e]
+                       (is false (str "source-miss test threw: " e))
+                       (done))))))))
+
+#?(:cljs
+   (deftest worker-native-source-that-rejects-is-skipped-not-fatal
+     ;; The getter's own docstring says a source that "rejects" is SKIPPED the
+     ;; way a mismatching provider is. Measured before this change it was not:
+     ;; the rejection escaped the whole getter and the read FAILED, where the
+     ;; sync getter catches a throwing source, counts it, and falls through.
+     ;; A pack whose range-fn has one bad minute took down reads that
+     ;; discovery could have served.
+     (async done
+       (let [wanted (ipld/node->block {"kind" "wanted"})
+             discoveries (atom 0) fetches (atom 0) stats (atom {})
+             source (with-meta
+                      (fn [_cid] (js/Promise.reject (ex-info "pack offline" {})))
+                      {:stats stats})
+             getter (counting-getter {:block-source source
+                                      :served {(:cid wanted) (:bytes wanted)}
+                                      :discoveries discoveries :fetches fetches})]
+         (-> (getter (:cid wanted))
+             (.then (fn [got]
+                      (is (some? got) "the provider path served a read the source rejected")
+                      (is (= 1 @discoveries) "and it cost exactly one discovery")
+                      (is (= 1 (:source-failures @stats))
+                          "the rejection is COUNTED -- this one IS a failure, unlike a miss")
+                      (done)))
+             (.catch (fn [e]
+                       (is false (str "a rejecting source must not be fatal: " e))
+                       (done))))))))
+
+#?(:cljs
+   (deftest worker-native-source-that-throws-synchronously-is-skipped
+     ;; `(js/Promise.resolve (block-source cid))` evaluates the call BEFORE
+     ;; wrapping it, so a source that throws rather than rejecting threw
+     ;; straight out of the getter. The sync getter has always caught this.
+     (async done
+       (let [wanted (ipld/node->block {"kind" "wanted"})
+             discoveries (atom 0) fetches (atom 0) stats (atom {})
+             source (with-meta (fn [_cid] (throw (ex-info "pack blew up" {})))
+                      {:stats stats})
+             getter (counting-getter {:block-source source
+                                      :served {(:cid wanted) (:bytes wanted)}
+                                      :discoveries discoveries :fetches fetches})]
+         (-> (getter (:cid wanted))
+             (.then (fn [got]
+                      (is (some? got) "a synchronously throwing source is skipped, not fatal")
+                      (is (= 1 @discoveries) "one discovery")
+                      (is (= 1 (:source-failures @stats)) "counted")
+                      (done)))
+             (.catch (fn [e]
+                       (is false (str "a throwing source must not be fatal: " e))
+                       (done))))))))
+
+#?(:cljs
+   (deftest worker-native-source-miss-does-not-retry-a-failed-fall-through
+     ;; The fix routes a miss and a corrupt source through ONE fall-through.
+     ;; If that fall-through's own failure were allowed back into the source's
+     ;; error handler, a dead provider would buy a second discovery -- the
+     ;; same doubling this change removed, wearing different clothes. Nothing
+     ;; served the block here, so the read must fail after exactly one try.
+     (async done
+       (let [wanted (ipld/node->block {"kind" "wanted"})
+             discoveries (atom 0) fetches (atom 0) stats (atom {})
+             source (with-meta (fn [_cid] (js/Promise.resolve nil)) {:stats stats})
+             getter (counting-getter {:block-source source :served {}
+                                      :discoveries discoveries :fetches fetches})]
+         (-> (getter (:cid wanted))
+             (.then (fn [_]
+                      (is false "no provider had the block; the read must not succeed")
+                      (done)))
+             (.catch (fn [e]
+                       (is (= :ayatori/all-providers-failed (refusal-type e))
+                           "it fails for the provider reason, not for a nil dereference")
+                       (is (= 1 @discoveries)
+                           "a failing fall-through is not retried through the source handler")
+                       (is (zero? (:source-failures @stats))
+                           "and the miss is still not counted as a source failure")
                        (done))))))))
 
 #?(:clj

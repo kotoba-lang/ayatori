@@ -250,8 +250,19 @@ discovery; one that returns the wrong bytes is refused by the same CID rehash
 a provider's bytes get, skipped rather than made fatal, and counted as
 `:source-failures` so a corrupt pack is visible rather than merely slow.
 
-⚠ `:block-source` is threaded through the **synchronous** getter only. A
-Worker on `open-snapshot-async` still pays discovery per block behind a pack.
+`open-snapshot-async` takes the same `:block-source` and gives the same
+answer: a block the source carries costs zero discoveries there too, and a
+source that misses, rejects, or throws is skipped rather than made fatal.
+
+Measured 2026-09-06, a miss on the async path used to cost **two** discoveries
+and two fetches -- worse than passing no source at all -- and count two
+`:source-failures`. A paren closed the `if-not` early, so the miss branch was
+no longer a branch: it ran discovery for effect, discarded the Promise (which
+rejected unheard and could take down the process), then fell into
+`verify-block!` with nil bytes and bought a second discovery on the way out.
+A miss is now uncounted, because a source that does not carry a block has not
+failed at anything: counting it makes a pack that legitimately holds half the
+blocks indistinguishable from a corrupt one.
 
 ### There is no default block layout, and `:packed-blocks` needs `:range-read`
 
