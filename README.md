@@ -1,5 +1,37 @@
 # ayatori
 
+`ayatori.disclosure/recipient-decryptor-async` connects recipient-bound key
+delivery to `remote/open-snapshot-async`'s existing `:decrypt-fn`:
+
+```clojure
+(require '[ayatori.disclosure :as disclosure])
+
+(def decrypt
+  (disclosure/recipient-decryptor-async
+   {:context! trusted-context-for-ciphertext-cid
+    :request! sign-request-for-exact-grant
+    :deliver! call-key-delivery-service
+    :verify! verify-executor-signature-with-trusted-registry
+    :open! qualified-hybrid-unwrap-and-content-decrypt
+    :crypto-policy production-hybrid-policy}))
+;; Pass decrypt as :decrypt-fn to remote/open-snapshot-async below.
+```
+
+These are host ports, not built-in credentials or a deployed key endpoint.
+Each encrypted value is hashed to its raw CID; a signed delivery receipt must
+bind that CID, request, recipient encryption key, grant, policy and epoch before
+`open!` can run. Local time/epoch is refreshed after delivery. Ciphertext memo
+hits do not cache authority. `recipient-decryptor` is the synchronous equivalent
+and refuses Promise ports. Existing query visibility and governed execution
+remain required; this adapter does not add permissions to a query.
+
+The wire contract and provider obligations live in
+[`kotobase/docs/disclosure-grants.edn`](https://github.com/kotoba-lang/kotobase/blob/feat/recipient-disclosure-grants/docs/disclosure-grants.edn).
+The key envelope must stay behind the service until its delivery event is
+durable. Publishing it in advance defeats delivery auditing. Recipient-specific
+grant CIDs identify distribution paths, not different identities for identical
+decrypted bytes. Scope is an exact ciphertext object in this first profile.
+
 [![CI](https://github.com/kotoba-lang/ayatori/actions/workflows/ci.yml/badge.svg)](https://github.com/kotoba-lang/ayatori/actions/workflows/ci.yml)
 
 **The query plane woven from IPLD graphs and IPNI provider discovery.**
@@ -586,7 +618,7 @@ git clone https://github.com/kotoba-lang/datom-source .deps/datom-source
 git clone https://github.com/kotoba-lang/datalog .deps/datalog
 git clone https://github.com/kotoba-lang/io-ipni-specs .deps/io-ipni-specs
 git clone https://github.com/kotoba-lang/org-nist-sha2 .deps/org-nist-sha2
-nbb --classpath "src:test:.deps/kotobase/src:.deps/arrangement/src:.deps/prolly-tree/src:.deps/io-ipld/src:.deps/io-ipld-car/src:.deps/io-multiformats/src:.deps/org-ietf-cbor/src:.deps/dev-protobuf/src:.deps/datom-source/src:.deps/datalog/src:.deps/io-ipni-specs/src:.deps/org-nist-sha2/src" bin/run_tests.cljs
+nbb --classpath "src:test:.deps/kotobase/src:.deps/security/src:.deps/arrangement/src:.deps/prolly-tree/src:.deps/io-ipld/src:.deps/io-ipld-car/src:.deps/io-multiformats/src:.deps/org-ietf-cbor/src:.deps/dev-protobuf/src:.deps/datom-source/src:.deps/datalog/src:.deps/io-ipni-specs/src:.deps/org-nist-sha2/src" bin/run_tests.cljs
 ```
 
 Each `.deps/<name>` should be checked out at the SHA pinned in `deps.edn`
