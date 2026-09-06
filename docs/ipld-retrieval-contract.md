@@ -53,7 +53,7 @@ index header claiming one code group and carrying none of it spun without
 yielding, because an out-of-range read returned `NaN` and `NaN` compares false
 against every guard. In a Worker that is the isolate, not a slow request.
 
-## Proposed selective hydration
+## Selective hydration
 
 Input: immutable root CID, standard Selector, explicitly supported ADL versions,
 and budgets for bytes, blocks, depth, and traversal work. Output: independently
@@ -64,6 +64,40 @@ ADL substrate blocks. Merely listing Matcher results is insufficient.
 Replay traversal locally; reject missing dependencies and unsupported forms.
 Deduplicate fetched bytes by CID while retaining traversal state by path and
 Selector state. Reaching a work limit is incomplete retrieval, not success.
+
+Replay landed 2026-09-06 as `ipld.car.trustless/replay-selection`, the verifier
+counterpart to `selection-car`. It is not that function read backwards: a
+producer may trust its own store, a verifier may trust nothing it was handed.
+Three things it must not believe, each silent by default.
+
+`car/decode` does not verify. It keys blocks by the CID the frame *declares*
+and never rehashes them, so an archive whose frame claims one CID while
+carrying another block's bytes decodes without complaint. CARv2's `read-frame`
+*does* verify, which is the trap -- the habit does not carry from v2 to v1.
+Replay inherits verification from `select-blocks`, which rehashes every block
+it fetches.
+
+A CAR's roots header is a claim by whoever wrote the archive. Replaying from it
+shows the sender's archive is self-consistent, which is not the question; the
+caller's root is what binds the graph.
+
+An archive missing a block the traversal needs is no answer, not a shorter one.
+
+Every failure is thrown and typed apart -- `:ipld/car-root-mismatch`,
+`:ipld/invalid-selector`, `:ipld/missing-block`, `:ipld/cid-mismatch`,
+`:ipld/resource-limit` -- because a completion flag in a returned map is a
+value a caller can drop on the floor. The selector is taken as canonical
+DAG-CBOR rather than an executable form, so it is something a verifier can
+hash and agree with a producer about, and decoding it is where a form outside
+the supported subset is refused instead of quietly matching less. Blocks the
+archive carried but the traversal never reached are reported as `:unused`
+rather than rejected -- logical selection legitimately loads shared blocks
+holding other rows -- but they are unverified, since only touched blocks were
+rehashed.
+
+Ayatori does not yet expose replay through its own retrieval surface; it is
+available from `io-ipld-car` and this contract now describes real behaviour
+rather than a proposal.
 Selectors do not choose Datalog indexes or express ordered-map key intervals:
 `ExploreRange` is a list-position interval. Initially, database range cursors
 can record visited CIDs as a custom artifact with no standard-Selector claim.
