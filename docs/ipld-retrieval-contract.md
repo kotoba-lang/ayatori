@@ -1,7 +1,6 @@
 # IPLD retrieval contract
 
-Status: Proposed extension of the existing CARv2 reader, not a Selector-engine
-implementation. See [Kotobase ADR-2609060000](https://github.com/kotoba-lang/kotobase/blob/178711d107154db5cf00a3bf7c24f79ed854f08a/docs/adr/2609060000-ipld-adl-selector-car-boundaries.md).
+Status: Accepted boundary contract; Selector-engine implementation remains open. See [Kotobase ADR-2609060000](https://github.com/com-junkawasaki/root/blob/main/90-docs/adr/2609060000-ipld-adl-selector-car-boundaries.edn).
 
 ## Existing implementation
 
