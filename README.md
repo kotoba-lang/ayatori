@@ -1,5 +1,28 @@
 # ayatori
 
+**The query plane of kotobase — it is what makes a content-addressed IPLD graph
+queryable.** IPLD owns the values, their links and their verification; IPNI says
+where a CID may be available; CARv2 says where inside an object a block's bytes
+begin. Ayatori weaves those into one Datalog-queryable projection over
+[`arrangement`](https://github.com/kotoba-lang/arrangement) snapshots — 綾取り
+(*ayatori*, cat's cradle) is the weaving. The name says nothing about the
+function, so this line does.
+
+| namespace | what it does |
+|---|---|
+| `ayatori.discovery` | IPNI / Delegated Routing provider lookup over an injected transport |
+| `ayatori.remote` | verified provider block reads and range-pruned queries over persistent arrangement snapshots |
+| `ayatori.pack` | CARv2 packs as a block source under `remote`, for blocks that were written together |
+| `ayatori.query` | materialization, visibility-carrying access paths, Datalog |
+| `ayatori.agent` | pure query generation and validation — the entry an LLM writes through |
+| `ayatori.disclosure` | recipient-bound key delivery into `remote`'s existing `:decrypt-fn` |
+
+The sections below open with `disclosure` for historical reasons. The query
+plane itself starts at **`ayatori.remote` — IPNI → verified IPLD → persistent
+query**.
+
+---
+
 `ayatori.disclosure/recipient-decryptor-async` connects recipient-bound key
 delivery to `remote/open-snapshot-async`'s existing `:decrypt-fn`:
 
