@@ -36,7 +36,7 @@ decrypted bytes. Scope is an exact ciphertext object in this first profile.
 
 **The query plane woven from IPLD graphs and IPNI provider discovery.**
 
-See the proposed [IPLD retrieval contract](docs/ipld-retrieval-contract.md) for
+See the accepted [IPLD retrieval contract](docs/ipld-retrieval-contract.md) for
 Selector hydration, CAR interoperability limits, and implementation gates.
 
 Ayatori bridges [`kotobase`](https://github.com/kotoba-lang/kotobase)'s flat document
