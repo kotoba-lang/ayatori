@@ -4,7 +4,18 @@
   serving a pack without discovery, and the corrupt-source fall-through."
   (:require [arrangement.core :as arr]
             [ayatori.remote :as remote]
-            [clojure.test :as t :refer [deftest is async]]))
+            [clojure.test :as t :refer [deftest is]]
+            ;; `async` is a cljs.test macro; `clojure.test` has no such var, so
+            ;; referring it unconditionally makes this namespace fail to LOAD on
+            ;; the JVM -- before any test runs, and before the `#?(:clj)` body
+            ;; below is ever reached. The cognitect runner loads namespaces
+            ;; before running them, so one unloadable file takes the whole suite
+            ;; down: measured on murakumo/levi, `test-ayatori-739ffc2` exited 1
+            ;; with `async does not exist` and no test summary at all.
+            ;;
+            ;; `remote_test` and `discovery_test` already had it this way. This
+            ;; file did not, and it is the one the gate stopped at.
+            #?(:cljs [cljs.test :refer [async]])))
 
 (defn- providers [cid peers]
   {:ok? true :cid cid :mutates-cid? false
