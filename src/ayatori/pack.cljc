@@ -92,7 +92,28 @@
 (defn- safe-offset? [n]
   (and (integer? n) (<= 0 n b/max-safe-integer)))
 
-(defn- validate-header! [{:keys [data-offset data-size index-offset] :as header}]
+(def ^:const max-index-bytes
+  "Ceiling on the index this reader will fetch and hold, in bytes.
+
+  The index is fetched before its size is known -- `index-offset` says where
+  it starts and nothing says where it ends -- so without a ceiling the read
+  is `bytes=N-`, whatever that turns out to be. 8 MiB indexes roughly 200k
+  blocks at MultihashIndexSorted's 40 bytes a record, which is far past any
+  pack this writer produces (one commit, one pack). A caller packing larger
+  passes `:max-index-bytes`; the point is that the number exists and the
+  reader chose it, rather than the archive choosing it."
+  8388608)
+
+(defn- validate-header!
+  "Qualify the whole header, not only the parts this reader happens to use.
+
+  The bounds checks are the payload/index geometry. The characteristics check
+  is the other half: CARv2 has a 128-bit bitfield by which an archive says it
+  is not an ordinary one, and this reader implements no characteristic. Read
+  and discarded, a set bit and a clear bit produce the same read -- the
+  archive declared something and the reader proceeded as though it had not.
+  So a declared characteristic is refused here rather than ignored."
+  [{:keys [data-offset data-size index-offset] :as header}]
   (when-not (and (safe-offset? data-offset) (<= header-bytes data-offset)
                  (safe-offset? data-size) (pos? data-size)
                  (<= data-size (- b/max-safe-integer data-offset))
@@ -101,6 +122,13 @@
                      (<= (+ data-offset data-size) index-offset)))
     (throw (ex-info "ayatori: invalid CARv2 payload/index bounds"
                     {:type :ayatori/invalid-pack-bounds :header header})))
+  (when-not (car2/no-characteristics? header)
+    (throw (ex-info (str "ayatori: this CARv2 declares a characteristic and "
+                         "this reader implements none. Proceeding would read "
+                         "an archive that said it was not ordinary as though "
+                         "it were.")
+                    {:type :ayatori/unsupported-pack-characteristics
+                     :characteristics (:characteristics header)})))
   header)
 
 (defn- bounded-index
@@ -142,7 +170,8 @@
   Costs two range reads regardless of how many blocks are later read out of
   the pack. `:reads` counts every range request this handle has issued, so a
   caller can assert round trips rather than assume them."
-  [{:keys [range-fn profile read-ahead]}]
+  [{:keys [range-fn profile read-ahead max-index-bytes]
+    :or {max-index-bytes max-index-bytes}}]
   (when-not (fn? range-fn)
     (throw (ex-info "ayatori: range-fn is required"
                     {:type :ayatori/missing-range-fn})))
@@ -167,7 +196,22 @@
     ;; `index-offset`, which is not where the index sits in a range response.
     ;; The index bytes come back at offset 0 of their own body, so decode
     ;; them directly rather than reassembling a fake archive around them.
-    (let [index (idx/decode (fetch (str "bytes=" index-offset "-")) 0)]
+    ;; Bounded, not open-ended. `bytes=N-` asks for the rest of the object and
+    ;; the reader learns how much that was by already holding it; a pack whose
+    ;; tail is large -- or a store that ignores the Range and returns the whole
+    ;; archive -- is then an unbounded read that no downstream check can undo.
+    ;; A short response is fine: `idx/decode` refuses a truncated index rather
+    ;; than returning the empty one it cannot distinguish from a real answer.
+    (let [index-body (fetch (str "bytes=" index-offset "-"
+                                 (+ index-offset max-index-bytes -1)))
+          _ (when (> (b/bcount index-body) max-index-bytes)
+              (throw (ex-info (str "ayatori: index read exceeded "
+                                   max-index-bytes " bytes -- the store "
+                                   "returned more than the requested range")
+                              {:type :ayatori/index-too-large
+                               :bytes (b/bcount index-body)
+                               :limit max-index-bytes})))
+          index (idx/decode index-body 0)]
       {:header header
        :index index
        :bounded (bounded-index header index)
