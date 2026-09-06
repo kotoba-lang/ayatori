@@ -59,14 +59,9 @@
   51)
 
 (def ^:const default-read-ahead
-  "Bytes requested per block read.
-
-  The CARv2 index stores where a frame starts and not how long it is, so a
-  reader holding only the index must over-fetch and let `read-frame` use the
-  frame it finds. 64 KiB is the string-leaf ceiling named in ADR-2608160100,
-  so one read covers any single block that ceiling admits. Callers holding
-  real `:frame-length` values from `pack` should pass them instead and fetch
-  exactly the frame."
+  "Historical read-ahead default, retained in the pack handle for API
+  compatibility. `read-block` now always uses validated index-derived bounds
+  rather than a fixed-size read-ahead window."
   65536)
 
 (defn block-profile!
@@ -94,6 +89,20 @@
                      :profile profile})))
   profile)
 
+(defn- safe-offset? [n]
+  (and (integer? n) (<= 0 n b/max-safe-integer)))
+
+(defn- validate-header! [{:keys [data-offset data-size index-offset] :as header}]
+  (when-not (and (safe-offset? data-offset) (<= header-bytes data-offset)
+                 (safe-offset? data-size) (pos? data-size)
+                 (<= data-size (- b/max-safe-integer data-offset))
+                 (safe-offset? index-offset)
+                 (or (zero? index-offset)
+                     (<= (+ data-offset data-size) index-offset)))
+    (throw (ex-info "ayatori: invalid CARv2 payload/index bounds"
+                    {:type :ayatori/invalid-pack-bounds :header header})))
+  header)
+
 (defn- bounded-index
   "The index records with an index-derived read bound attached to each.
 
@@ -108,19 +117,20 @@
   Reading to the next distinct record needs no extra fetch. The bound is
   exact only with complete, contiguous frame coverage; sparse indexes can
   include additional sections in the read. The final bound uses :data-size.
-  Duplicate offsets are not normalized here and can yield zero-length bounds.
-  See docs/ipld-retrieval-contract.md for compatibility gates."
+  Repeated offsets share the same next-distinct-offset bound. All offsets
+  must lie inside the payload before any block range is requested."
   [{:keys [data-offset data-size]} index]
-  (let [sorted (vec (sort-by :payload-offset index))
-        end (+ data-offset data-size)]
-    (vec (map-indexed
-          (fn [i r]
-            (let [start (+ data-offset (:payload-offset r))
-                  next-start (if-let [n (get sorted (inc i))]
-                               (+ data-offset (:payload-offset n))
-                               end)]
-              (assoc r :file-offset start :frame-length (- next-start start))))
-          sorted))))
+  (doseq [{:keys [payload-offset]} index]
+    (when-not (and (safe-offset? payload-offset) (< 0 payload-offset data-size))
+      (throw (ex-info "ayatori: index offset outside CARv1 payload"
+                      {:type :ayatori/invalid-index-offset
+                       :payload-offset payload-offset :data-size data-size}))))
+  (let [offsets (vec (sort (distinct (map :payload-offset index))))
+        ends (zipmap offsets (concat (rest offsets) [data-size]))]
+    (mapv (fn [{:keys [payload-offset] :as r}]
+            (assoc r :file-offset (+ data-offset payload-offset)
+                     :frame-length (- (get ends payload-offset) payload-offset)))
+          (sort-by :payload-offset index))))
 
 (defn open-pack
   "Read a pack's header and index, and return a handle for block reads.
@@ -145,7 +155,7 @@
                                     {:type :ayatori/empty-range-response
                                      :range range-value}))))
         head-bytes (fetch (str "bytes=0-" (dec header-bytes)))
-        header (car2/parse-header head-bytes)
+        header (validate-header! (car2/parse-header head-bytes))
         index-offset (:index-offset header)]
     (when-not (pos? index-offset)
       (throw (ex-info (str "ayatori: this CARv2 carries no index (index-offset "
@@ -165,39 +175,51 @@
        :read-ahead (or read-ahead default-read-ahead)
        :fetch fetch})))
 
+(defn- locations [{:keys [bounded]} cid]
+  (let [{:keys [digest mh-code]} (car/read-cid (car/cid->bytes cid) 0)]
+    (->> bounded
+         (filter #(and (= mh-code (:mh-code %)) (b/equal? digest (:digest %))))
+         (reduce (fn [result r]
+                   (if (= (:file-offset (peek result)) (:file-offset r))
+                     result (conj result r))) [])
+         seq)))
+
 (defn locate
-  "Where `cid` starts in this pack and its read bound, or nil when the
-  pack does not carry it.
+  "First multihash candidate's offset and read bound, or nil if none exists.
 
   Unlike `ipld.car.v2/locate` this returns `:frame-length` too, derived from
-  the neighbouring index records rather than fetched -- see `bounded-index`."
-  [{:keys [header bounded]} cid]
-  (let [{:keys [digest]} (car/read-cid (car/cid->bytes cid) 0)]
-    (some (fn [r] (when (b/equal? digest (:digest r)) r)) bounded)))
+  the neighbouring index records rather than fetched -- see `bounded-index`.
+  The full CID (including codec) is checked by `read-block`."
+  [pack cid]
+  (first (locations pack cid)))
 
 (defn read-block
-  "Read one block out of an opened pack with a single range request.
+  "Read one block out of an opened pack, verifying the requested full CID.
+
+  Normally costs one range request. Multiple codec aliases for the same
+  multihash may require trying multiple distinct indexed offsets.
 
   Returns the block's bytes, or nil when the pack does not carry `cid` -- a
   pack that does not have a block is an answer, not an error, so a caller can
   fall back to the per-object path. `ipld.car.v2/read-frame` verifies the CID
   of whatever frame it parses, so bytes returned here have already been
   checked against the identity the index claimed."
-  [{:keys [fetch read-ahead] :as pack} cid]
-  (when-let [loc (locate pack cid)]
-    (let [body (fetch (if-let [len (:frame-length loc)]
-                        ;; Index neighbours bound the read; sparse indexes
-                        ;; may include additional frames in this range.
-                        (car2/range-header (assoc loc :frame-length len))
-                        ;; a pack whose index gave no neighbour to bound
-                        ;; against still works, by over-fetching
-                        (car2/range-open loc read-ahead)))
-          {frame-cid :cid frame-bytes :bytes} (car2/read-frame body 0)]
-      (when-not (= (str cid) (str frame-cid))
+  [{:keys [fetch] :as pack} cid]
+  (loop [candidates (locations pack cid) found nil]
+    (if-let [loc (first candidates)]
+      (let [body (fetch (car2/range-header loc))
+            ;; Even an overlong response cannot extend the index/payload bound.
+            bounded-body (b/slice body 0 (min (b/bcount body) (:frame-length loc)))
+            {frame-cid :cid frame-bytes :bytes} (car2/read-frame bounded-body 0)]
+        (if (= (str cid) (str frame-cid))
+          frame-bytes
+          ;; An index identifies a multihash, not a codec. Another indexed
+          ;; occurrence can carry the requested full CID over the same bytes.
+          (recur (next candidates) frame-cid)))
+      (when found
         (throw (ex-info "ayatori: pack index pointed at a different block"
                         {:type :ayatori/pack-index-mismatch
-                         :wanted (str cid) :found (str frame-cid)})))
-      frame-bytes)))
+                         :wanted (str cid) :found (str found)}))))))
 
 (defn pack-fetcher
   "A `fetch-fn` for `ayatori.remote/provider-block-getter`, backed by a pack.
