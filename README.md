@@ -69,9 +69,22 @@ producing the same envelope.
 
 The provider under this port is qualified — `envelope.qualify` runs the
 deployed ML-KEM module against known answers BouncyCastle generated and hands
-the evidence to `kotoba.security.crypto-policy/evaluate-pq-provider`. Key
-custody is not: `:keys!` is where that gap lives, and it is a port precisely
-so it is visible.
+the evidence to `kotoba.security.crypto-policy/evaluate-pq-provider`.
+
+`:keys!` has a custodian behind it now: `envelope.keystore/unlocker` over
+records that hold public material and two wraps, with the fingerprint derived
+from the keys rather than assigned to them, and the unlock secret supplied
+per call. A grant's `:recipient-key` is that derived fingerprint, so the
+issuer and the custodian name the recipient the same way from the same bytes
+instead of agreeing on a label. What a store can refuse that a closure over a
+key cannot: an unknown recipient (`:no-key-for-recipient`), a revoked one
+(`:key-not-active` — not the same answer, because an audit that cannot tell
+them apart cannot see a revocation take effect), and a device that is not
+unlocked.
+
+Where the unlock secret itself comes from — a passkey PRF output, a device
+keychain, an operator-held key — is still the deployment's, and is supplied
+per call rather than held anywhere.
 
 [![CI](https://github.com/kotoba-lang/ayatori/actions/workflows/ci.yml/badge.svg)](https://github.com/kotoba-lang/ayatori/actions/workflows/ci.yml)
 
@@ -677,10 +690,19 @@ and one of the skews — `io-multiformats` at `b3b157e6` instead of `561fe7df`
 disabled fleet-wide and are not the CI authority, ADR-2607300900), so it is
 left alone rather than kept up; read the pins from `deps.edn`.
 
-Measured 2026-09-06 on nbb 1.5.212 / Node 26.7.0: **131 tests, 399
+Measured 2026-09-06 on nbb 1.5.212 / Node 26.7.0: **137 tests, 407
 assertions, 0 failures, 0 errors**, including real AES-GCM content through a
 verified remote cursor and a real hybrid-KEM-wrapped content key delivered
-through `ayatori.disclosure-open`.
+through `ayatori.disclosure-open` and unlocked from a real keystore record.
+
+`ayatori.suite` grew a third floor with this change: every `(deftest` at the
+start of a line in a test file must correspond to a registered test var, and
+a mismatch exits 2. It was earned in `kotoba-lang/envelope`, where seven of a
+new file's twelve `deftest` forms were swallowed into a preceding form by one
+unbalanced paren — the file parsed, the namespace loaded, the runner ran the
+five that survived and printed `0 failures`. Files carrying reader
+conditionals cannot be counted this way and are reported as unchecked rather
+than silently skipped.
 
 The `:test` alias in `deps.edn` is the JVM **compat** suite only (`clojure
 -M:test`, via `tools.deps` transitive git-dep resolution — no manual

@@ -55,7 +55,7 @@
         ;; provider under this port is no longer the qualified one.
         io.github.kotoba-lang/envelope
         {:git/url "https://github.com/kotoba-lang/envelope.git"
-         :git/sha "802716de868d8e13719b3e62e49c42649e8a5557"}}
+         :git/sha "16d65d5d96e6ff25d83a70e663f25a0f7d2970eb"}}
  ;; First-class runtime is nbb/cljs (repo-wide runtime priority):
  ;; the exact classpath lives in bin/run_tests.cljs, which is the runner.
  ;; The :test alias below is the :clj COMPAT suite only -- not the

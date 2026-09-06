@@ -40,11 +40,23 @@
   from within `run!` loads nothing and `t/run-tests` throws
   `No namespace: ... found`. Loud, but for the wrong reason.
 
-  Two floors, because a runner that cannot see the suite must not return
+  Three floors, because a runner that cannot see the suite must not return
   the same value as a runner that saw it and found nothing wrong:
 
     - zero test namespaces found  -> exit 2 (wrong directory / bad classpath)
     - zero assertions executed    -> exit 2 (namespaces loaded but empty)
+    - a file declares more `deftest` forms than its namespace registers
+                                  -> exit 2 (forms swallowed by a paren)
+
+  The third was earned in kotoba-lang/envelope on 2026-09-06: seven of a new
+  test file's twelve `deftest` forms were swallowed into a preceding form by
+  one unbalanced paren. The file parsed, the namespace loaded, the runner ran
+  the five that survived and printed `0 failures`. Deriving the namespace
+  list from disk does not catch that -- the file IS on disk and the namespace
+  IS loaded, and what went missing is inside it. Counting `(deftest` at the
+  start of a line and comparing with the registered vars does. It over-counts
+  only if a top-level string contains such a line, which refuses rather than
+  passes.
 
   Exit 2 is neither 0 nor 1: \"could not answer\" is not a pass and not a
   failure."
@@ -82,14 +94,62 @@
   (println (str/join " " (cons "REFUSING to report a pass:" msg)))
   (js/process.exit 2))
 
+(defn- test-files
+  "Every `*_test.clj[cs]` under `test/`, as paths, in the order
+  `test-namespaces` returns their namespaces."
+  []
+  (->> (walk "test") (filter #(re-find #"_test\.clj[cs]$" %)) sort vec))
+
+(defn- declared-tests
+  "`(deftest` forms at the start of a line. A form nested inside another --
+  which is what an unbalanced paren produces -- is indented, so it does not
+  match, and neither does it register."
+  [file]
+  (count (re-seq #"(?m)^\(deftest " (fs/readFileSync file "utf8"))))
+
+(defn- registered-tests [ns-sym]
+  (count (filter #(:test (meta %)) (vals (ns-interns ns-sym)))))
+
+(defn- conditional?
+  "A file with a reader conditional registers a different set of tests per
+  runtime, and which arm applied is not something a text scan can know.
+  Measured 2026-09-06 in this repo: `async_block_source_test.cljc` declares
+  three `deftest` forms inside `#?(:cljs ...)` and registers two, and
+  `remote_test.cljc` has fourteen occurrences of which seven are top level.
+  Counting those would refuse a suite that is fine."
+  [file]
+  (str/includes? (fs/readFileSync file "utf8") "#?"))
+
+(defn- check-nothing-was-swallowed!
+  "Every declared test has to exist as a var, for the files where declared
+  can be counted. See the ns docstring for the day this was not true and
+  nothing said so.
+
+  Returns the number of files it could NOT check, which the caller prints:
+  a floor that quietly covers half the suite is the shape of problem this
+  floor exists to catch."
+  [files nss]
+  (let [checkable (remove (fn [[file _]] (conditional? file)) (map vector files nss))]
+    (doseq [[file ns-sym] checkable]
+      (let [declared (declared-tests file) registered (registered-tests ns-sym)]
+        (when (not= declared registered)
+          (refuse! (str file ":") declared "deftest form(s) at the start of a line,"
+                   registered "registered in" (str ns-sym ".")
+                   "A form swallowed by an unbalanced paren still parses."))))
+    (- (count files) (count checkable))))
+
 (defn run!
   "Load and run every test namespace found on disk."
   []
-  (let [nss (test-namespaces)]
+  (let [nss (test-namespaces)
+        files (test-files)]
     (when (zero? (count nss))
       (refuse! "no *_test.clj[cs] under test/ --"
                "run this from the repo root with test/ on the classpath"))
-    (println "SCANNED" (count nss) "test namespaces:" (str/join ", " nss))
+    (let [unchecked (check-nothing-was-swallowed! files nss)]
+      (println "SCANNED" (count nss) "test namespaces:" (str/join ", " nss))
+      (println "SWALLOW-CHECKED" (- (count files) unchecked) "of" (count files)
+               "file(s);" unchecked "carry reader conditionals and cannot be counted"))
     (defmethod t/report [:cljs.test/default :end-run-tests] [m]
       (if (zero? (+ (:pass m) (:fail m) (:error m)))
         (refuse! "0 assertions ran across" (count nss) "namespaces")
