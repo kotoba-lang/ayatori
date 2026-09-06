@@ -416,6 +416,29 @@
                          {:type :ayatori/all-providers-failed
                           :cid cid :attempts failures}))))]
        (attempt providers []))))
+
+#?(:cljs
+   (defn- discover-then-attempt-async
+     "Discovery, then the provider loop: the one path a block-source miss
+     falls through to, and the whole of the path when there is no source.
+
+     Extracted because there were three copies of it, and having three is how
+     one of them lost its place in the `if-not` below: a stray paren closed
+     the branch early, so the nil case ran discovery for effect, threw the
+     resulting Promise away, and then ran it AGAIN through `verify-block!`
+     rejecting on nil. A source that simply did not carry the block cost two
+     discoveries and two fetches -- more round trips than passing no source
+     at all. One copy cannot drift from itself."
+     [{:keys [cid discover-fn fetch-fn stats block-memo]}]
+     (-> (do (swap! stats update :discoveries inc)
+             (js/Promise.resolve (discover-fn cid)))
+         (.then (fn [result]
+                  (let [providers (validate-discovery! cid result)]
+                    (attempt-providers-async
+                     {:cid cid :providers providers
+                      :fetch-fn fetch-fn :stats stats
+                      :block-memo block-memo})))))))
+
 #?(:cljs
    (defn provider-block-getter-async
      "Worker-native `(fn [cid] -> Promise<verified-bytes>)` getter.
@@ -428,9 +451,21 @@
      `:block-source` is optional: `(fn [cid] -> bytes-or-nil-or-Promise)`,
      tried BEFORE discovery and awaited if it returns a Promise. Its bytes are
      verified on the same path as a provider's -- being local is not being
-     trusted. A source that answers with the wrong bytes, rejects, or resolves
-     nil is SKIPPED the way a mismatching provider is, but counted as
+     trusted. A source that answers with the wrong bytes, rejects, or throws
+     is SKIPPED the way a mismatching provider is, and counted as
      :source-failures so a corrupt pack is visible rather than merely slow.
+
+     A source that resolves NIL is skipped and NOT counted: it has not failed
+     at anything, it simply does not carry that block. Counting a miss makes
+     a pack that legitimately holds half the blocks read exactly like a
+     corrupt one, which is the distinction :source-failures exists to draw.
+     This matches `provider-block-getter`, whose miss is likewise uncounted.
+
+     Whatever the source does, a miss costs exactly ONE discovery -- the same
+     as passing no source at all. The two stages below are ordered so that a
+     fall-through which itself fails cannot re-enter the source's error
+     handler and buy a second one.
+
      The source call participates in the same `:in-flight` coalescing as a
      provider miss: concurrent callers for one CID share one source attempt.
      Absent `:block-source`, behaviour is unchanged."
@@ -449,53 +484,56 @@
                  (js/Promise.resolve cached))
              (if-let [pending (get @in-flight cid)]
                (do (swap! stats update :in-flight-hits inc) pending)
-               (let [request
+               (let [fall-through
+                     (fn []
+                       (discover-then-attempt-async
+                        {:cid cid :discover-fn discover-fn :fetch-fn fetch-fn
+                         :stats stats :block-memo block-memo}))
+                     request
                      (if block-source
-                       (-> (do (swap! stats update :source-attempts inc)
-                               (js/Promise.resolve (block-source cid)))
+                       ;; Two stages, and the order of the handlers is the
+                       ;; point. Stage one resolves the source to verified
+                       ;; bytes or to ::miss, and its `.catch` is attached
+                       ;; HERE -- before discovery is spliced in -- so a
+                       ;; fall-through that itself fails cannot re-enter this
+                       ;; handler and buy a second round of discovery.
+                       (-> (try (swap! stats update :source-attempts inc)
+                                ;; A source that throws synchronously must be
+                                ;; skipped like one that rejects; without this
+                                ;; the throw escapes the whole getter and the
+                                ;; read fails where the sync getter would have
+                                ;; fallen through.
+                                (js/Promise.resolve (block-source cid))
+                                (catch :default e (js/Promise.reject e)))
                            (.then (fn [bytes]
                                     (if-not bytes
-                                      (do (swap! stats update :source-failures inc)
-                                          ;; fall through to discovery: a nil
-                                          ;; source is "not in hand", not an
-                                          ;; error. Reuse the provider path.
-                                          (-> (do (swap! stats update :discoveries inc)
-                                                  (js/Promise.resolve (discover-fn cid)))
-                                              (.then (fn [result]
-                                                       (let [providers (validate-discovery! cid result)]
-                                                         (attempt-providers-async
-                                                          {:cid cid :providers providers
-                                                           :fetch-fn fetch-fn :stats stats
-                                                           :block-memo block-memo})))))))
-                                      (try
-                                        (let [verified (verify-block! cid bytes)]
-                                          (swap! block-memo assoc cid verified)
-                                          (swap! stats
-                                                 (fn [s]
-                                                   (-> s
-                                                       (update :source-hits inc)
-                                                       (update :verified-blocks inc)
-                                                       (update :verified-bytes + (byte-count verified)))))
-                                          verified)
-                                        (catch :default e
-                                          (swap! stats update :source-failures inc)
-                                          ;; corrupt source: same fall-through.
-                                          (-> (do (swap! stats update :discoveries inc)
-                                                  (js/Promise.resolve (discover-fn cid)))
-                                              (.then (fn [result]
-                                                       (let [providers (validate-discovery! cid result)]
-                                                         (attempt-providers-async
-                                                          {:cid cid :providers providers
-                                                           :fetch-fn fetch-fn :stats stats
-                                                           :block-memo block-memo}))))))))))
-                       (-> (do (swap! stats update :discoveries inc)
-                               (js/Promise.resolve (discover-fn cid)))
+                                      ;; Not in hand. The sync getter does not
+                                      ;; count this, and neither does this one:
+                                      ;; a source that does not carry the block
+                                      ;; has not failed at anything. Counting it
+                                      ;; makes a pack that legitimately holds
+                                      ;; half the blocks indistinguishable from
+                                      ;; a corrupt one.
+                                      ::miss
+                                      (let [verified (verify-block! cid bytes)]
+                                        (swap! block-memo assoc cid verified)
+                                        (swap! stats
+                                               (fn [s]
+                                                 (-> s
+                                                     (update :source-hits inc)
+                                                     (update :verified-blocks inc)
+                                                     (update :verified-bytes + (byte-count verified)))))
+                                        verified))))
+                           (.catch (fn [_]
+                                     ;; Threw, rejected, or answered with bytes
+                                     ;; that do not hash to the CID: counted,
+                                     ;; then skipped the way a mismatching
+                                     ;; provider is.
+                                     (swap! stats update :source-failures inc)
+                                     ::miss))
                            (.then (fn [result]
-                                    (let [providers (validate-discovery! cid result)]
-                                      (attempt-providers-async
-                                       {:cid cid :providers providers
-                                        :fetch-fn fetch-fn :stats stats
-                                        :block-memo block-memo}))))))
+                                    (if (= ::miss result) (fall-through) result))))
+                       (fall-through))
                      settled (-> request
                                  (.then (fn [verified]
                                           (swap! in-flight dissoc cid)
