@@ -1,13 +1,31 @@
 ;; nbb test runner — first-class runtime per repo rule (kotoba wasm >
 ;; clojurewasm > cljs > nbb > (jvm/bb)). Run from the repo root:
 ;;
-;;   nbb --classpath "src:test:.deps/kotobase/src:.deps/security/src:.deps/arrangement/src:.deps/prolly-tree/src:.deps/io-ipld/src:.deps/io-ipld-car/src:.deps/io-multiformats/src:.deps/org-ietf-cbor/src:.deps/dev-protobuf/src:.deps/datom-source/src:.deps/datalog/src:.deps/io-ipni-specs/src:.deps/block-cache/src:.deps/org-nist-sha2/src" bin/run_tests.cljs
+;;   npm install
+;;   nbb --classpath "$(cat bin/classpath.txt)" bin/run_tests.cljs
 ;;
-;; where every .deps/<name> is a checkout of the matching kotoba-lang repo
-;; at the SHA pinned in deps.edn (kotobase, arrangement, io-ipld,
-;; io-multiformats, io-ipni-specs) or in arrangement's own deps.edn
-;; transitively (prolly-tree, datom-source, datalog, block-cache).
-;; CI pins every one of them to the same SHAs.
+;; where every `.deps/<name>` is a checkout of the matching kotoba-lang repo
+;; at the SHA pinned for it. The direct ones are in this repo's deps.edn;
+;; the rest are transitive and are found by reading the deps.edn of the
+;; repo that names them:
+;;
+;;   kotobase      -> security
+;;   arrangement   -> prolly-tree, io-ipld, datom-source, datalog, block-cache
+;;   io-ipld       -> io-multiformats, org-ietf-cbor, dev-protobuf
+;;   io-multiformats -> org-nist-sha2
+;;   envelope      -> org-signal
+;;
+;; ⚠ `.github/workflows/ci.yml` carries a SECOND hand-copied list of those
+;; SHAs, its comments say the two are kept "in lockstep", and measured
+;; 2026-09-06 they are not: it pins kotobase bbf57df9 against deps.edn's
+;; 8484ed8f, arrangement a5d68dc8 against 9c9f45d4, io-ipld-car 5817936d
+;; against 79436d12, io-multiformats b3b157e6 against 561fe7df, and lists
+;; neither security nor block-cache. The io-multiformats skew alone stops
+;; the suite before a test runs (`kotobase.disclosure-grant` resolves
+;; `mf/cid->parts`, which that older pin does not have). That file is inert
+;; -- GitHub Actions is disabled fleet-wide and is not the CI authority
+;; (ADR-2607300900) -- so it is left alone rather than maintained. Read the
+;; pins from deps.edn, not from it.
 ;;
 ;; This entry names no test namespaces. `ayatori.suite` derives them from
 ;; the files on disk and refuses (exit 2) when it cannot see them -- see its
