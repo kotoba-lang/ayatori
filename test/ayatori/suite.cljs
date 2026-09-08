@@ -61,7 +61,7 @@
   Exit 2 is neither 0 nor 1: \"could not answer\" is not a pass and not a
   failure."
   (:require [cljs.test :as t]
-            [clojure.string :as str]
+            [kotoba.lang.text :as str]
             ["fs" :as fs]
             ["path" :as path]))
 
