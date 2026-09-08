@@ -32,7 +32,7 @@
             [ayatori.remote :as remote]
             [ipld.car.v2 :as car2]
             [ipld.car.bytes :as b]
-            [clojure.string :as str]))
+            [kotoba.lang.text :as str]))
 
 (defn- blind [x] (pr-str x))
 (defn- crypto [bytes] bytes)

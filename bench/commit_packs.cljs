@@ -33,7 +33,7 @@
   (:require [arrangement.core :as arr]
             [ayatori.pack :as pack]
             [ayatori.remote :as remote]
-            [clojure.string :as str]
+            [kotoba.lang.text :as str]
             [ipld.car.bytes :as b]
             [ipld.car.v2 :as car2]))
 

@@ -21,7 +21,7 @@
 (ns hyakka-pack
   (:require ["node:fs" :as fs]
             [ayatori.pack :as pack]
-            [clojure.string :as str]
+            [kotoba.lang.text :as str]
             [ipld.car :as car]
             [ipld.car.bytes :as b]
             [ipld.car.v2 :as car2]
