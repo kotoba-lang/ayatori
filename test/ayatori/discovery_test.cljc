@@ -14,7 +14,7 @@
 
   The transport is injected, so none of this touches a network."
   (:require [ayatori.discovery :as discovery]
-            [clojure.string :as str]
+            [kotoba.lang.text :as str]
             [clojure.test :refer [deftest is testing]]
             #?(:cljs [cljs.test :refer [async]])))
 

@@ -38,7 +38,7 @@
   loop looked semantic but were not — `[>= ?r 100000000000]` and `[?ni < 0]`
   are both a **predicate written as a data pattern**, which is syntax. A type
   system would have caught neither. Add types when a failure needs them."
-  (:require [clojure.string :as str]))
+  (:require [kotoba.lang.text :as str]))
 
 ;; ---------------------------------------------------------------- schema
 
