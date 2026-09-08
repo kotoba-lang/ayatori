@@ -22,7 +22,7 @@
             #?(:cljs [arrangement.datalog :as arrangement-datalog])
             [ayatori.discovery :as discovery]
             [ayatori.query :as query]
-            [clojure.string :as str]
+            [kotoba.lang.text :as str]
             [ipld.core :as ipld]
             [multiformats.core :as mf]
             [multiformats.multiaddr :as multiaddr]))

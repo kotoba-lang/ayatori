@@ -24,7 +24,12 @@
  ;; those transitive deps into their own `.deps/<name>` and list every
  ;; src dir on --classpath by hand -- see the README's Develop/test section
  ;; for the exact command.
- :deps {io.github.kotoba-lang/kotobase
+ :deps {
+        ;; kotoba.lang.text, not clojure.string. Pinned as an explicit floor:
+        ;; tools.deps takes the NEWEST sha it is shown, so without a floor here
+        ;; this repo silently rides whatever a sibling happens to name.
+        io.github.kotoba-lang/text {:git/sha "73bdb13ae7a3d004b44bca08be03a3191157a38f"}
+       io.github.kotoba-lang/kotobase
         {:git/sha "8484ed8f0102db81e020e4b5fa401d3e47f3caca"}
         io.github.kotoba-lang/arrangement
         {:git/sha "9c9f45d4cd043873cd5c5ea65fa3af8a8ead5e6d"}

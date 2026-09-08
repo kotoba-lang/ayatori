@@ -6,7 +6,7 @@
   those effects separate prevents an indexer response from being mistaken
   for content or query evidence. HTTP transport and JSON parsing are injected
   by the caller through `ipni.find`."
-  (:require #?(:cljs [clojure.string :as str])
+  (:require #?(:cljs [kotoba.lang.text :as str])
             [ipni.find :as ipni]))
 
 (def default-indexers ipni/default-indexers)
