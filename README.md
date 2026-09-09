@@ -697,7 +697,7 @@ retired") and `arrangement`'s own README / ADR-2607050700 for the merge.
 First-class runtime is **nbb/cljs** (repo-wide runtime priority):
 
 ```bash
-for repo in kotobase security arrangement prolly-tree io-ipld io-ipld-car \
+for repo in text kotobase security arrangement prolly-tree io-ipld io-ipld-car \
             io-multiformats org-ietf-cbor dev-protobuf datom-source datalog \
             block-cache io-ipni-specs org-nist-sha2 envelope org-signal; do
   git clone "https://github.com/kotoba-lang/$repo" ".deps/$repo"
@@ -724,10 +724,18 @@ and one of the skews — `io-multiformats` at `b3b157e6` instead of `561fe7df`
 disabled fleet-wide and are not the CI authority, ADR-2607300900), so it is
 left alone rather than kept up; read the pins from `deps.edn`.
 
-Measured 2026-09-06 on nbb 1.5.212 / Node 26.7.0: **137 tests, 407
-assertions, 0 failures, 0 errors**, including real AES-GCM content through a
-verified remote cursor and a real hybrid-KEM-wrapped content key delivered
-through `ayatori.disclosure-open` and unlocked from a real keystore record.
+`text` is first in that list and was missing from it, and from
+`bin/classpath.txt`, until 2026-09-09: every source, test and bench file here
+requires `kotoba.lang.text`, so the documented reproduction died at load with
+`Could not find namespace: kotoba.lang.text` before producing anything.
+`deps.edn` pinned the repo the whole time -- the hand-maintained classpath and
+this list are the two copies that drifted, which is the hazard the pin's own
+comment describes from the other direction.
+
+Measured 2026-09-09 on nbb / Node 26: **141 tests, 421 assertions, 0 failures,
+0 errors**, including real AES-GCM content through a verified remote cursor and
+a real hybrid-KEM-wrapped content key delivered through
+`ayatori.disclosure-open` and unlocked from a real keystore record.
 
 `ayatori.suite` grew a third floor with this change: every `(deftest` at the
 start of a line in a test file must correspond to a registered test var, and
