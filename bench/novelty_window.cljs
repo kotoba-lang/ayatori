@@ -46,9 +46,19 @@
 ;;
 ;; Round trips, never wall clock.
 ;;
+;; ## Section K: the depth production actually has
+;;
+;; G and H walk 64 links. kotobase's novelty chain at the fold threshold is FOUR
+;; (measured in kotoba-lang/kotobase-peer: segment size 16, depth = ceil(tx/16)).
+;; K reports ABSOLUTE round trips at that depth, because the packed arm's fixed 3
+;; per window amortises over 64 links and does not over 4 -- so a ratio taken at
+;; depth 64 overstates the prize by more than the grouping change is worth.
+;;
+;; Round trips, never wall clock.
+;;
 ;; Run:
 ;;   nbb --classpath "$(cat bin/classpath.txt)" bench/novelty_window.cljs
-;;   SECTION=g|h to run one.
+;;   SECTION=g|h|k to run one.
 
 (ns novelty-window
   (:require [arrangement.core :as arr]
@@ -238,15 +248,81 @@
     (println "tail = commits in the window that has not closed yet. At n = 8, 16, 24 it is empty;")
     (println "at 12 and 20 it is 4 commits, and those 4 are the NEWEST -- the ones a live read hits first.")))
 
+
+;; ── K: the depth production actually has ────────────────────────────────────
+;;
+;; G and H walk a chain 64 links deep. kotobase's novelty chain is NOT that deep,
+;; and iteration 05 got this wrong by quoting an ADR instead of the code.
+;;
+;; Measured 2026-09-09 in kotoba-lang/kotobase-peer -- `novelty_chain_depth_test`
+;; walks the real chain -- `novelty-segment-size` is 16, so depth = ceil(tx/16):
+;;
+;;     unfolded tx    1   4   16   17   32   64   128
+;;     chain depth    1   1    1    2    2    4     8
+;;
+;; At the fold threshold (64) the chain is FOUR links, not 64. root ADR-2608021000
+;; says depth equals the number of unfolded transactions; that describes the shape
+;; the repo left when segments landed -- `novelty-segment-size`'s own docstring
+;; says "1 was the original shape: one block per unfolded transaction".
+;;
+;; Ratios are the wrong unit at this depth: per window the packed arm pays a FIXED
+;; 3 (2 open + 1 catalog), which amortises over 64 links and does not over 4. So
+;; this section reports ABSOLUTE round trips, and the same 4 links are the ones
+;; kotobase-peer measured as written by 4 DIFFERENT commits (63, 47, 31, 15) --
+;; which is why W = 1 gets one link per pack here too.
+
+(defn- section-k []
+  (println)
+  (println "K. ABSOLUTE round trips at the depth fold maintains — ceil(tx/16), measured in kotobase-peer")
+  (println "   the prize is a count of round trips, not a ratio: the fixed 3 per window does not amortise over 4 links")
+  (println)
+  (println (fmt 10 "unfolded" 8 "links" 14 "| per-object" 12 "commit-pack" 12 "window-pack"
+                14 "win vs p-o" 16 "vs commit-pack"))
+  (println (str/join (repeat 96 "-")))
+  (reduce
+   (fn [pr [tx links]]
+     (.then pr
+            (fn [_]
+              (-> (history links 10)
+                  (.then
+                   (fn [h]
+                     (let [head (:head h)
+                           po-reads (atom 0)
+                           n-po (walk head (fn [cid] (swap! po-reads inc) (get @(:blocks h) cid)))
+                           po (* 2 @po-reads)
+                           arm (fn [w]
+                                 (let [groups (window-groups (:groups h) w)
+                                       ps (archives-of head (:blocks h) groups)
+                                       ctr {:reads (atom 0) :catalog-reads (atom 0)}
+                                       {:keys [source]} (packed-source ps ctr nil)
+                                       n (walk head source)]
+                                   (when-not (= n links)
+                                     (println "REFUSING: the packed walk at W =" w "visited" n "of" links)
+                                     (js/process.exit 2))
+                                   (+ @(:reads ctr) @(:catalog-reads ctr))))
+                           per-commit (arm 1)
+                           windowed (arm links)]
+                       (when-not (= n-po links)
+                         (println "REFUSING: the per-object walk visited" n-po "of" links)
+                         (js/process.exit 2))
+                       (println (fmt 10 tx 8 links 14 po 12 per-commit 12 windowed
+                                     14 (str (- po windowed) " trips")
+                                     16 (str (- per-commit windowed) " trips")))
+                       nil)))))))
+   (js/Promise.resolve nil)
+   ;; unfolded tx -> chain links, from the kotobase-peer measurement above
+   [[16 1] [17 2] [32 2] [64 4] [128 8] [1024 64]]))
+
 (defn -main []
   (println)
   (println "ayatori Co-Scientist 06 — pack the NOVELTY WINDOW, not the commit. Counted, not timed.")
-  (let [sec (or (some-> js/process.env.SECTION .toLowerCase) "gh")]
+  (let [sec (or (some-> js/process.env.SECTION .toLowerCase) "ghk")]
     (-> (history 64 10)
         (.then (fn [h]
                  (when (str/includes? sec "g") (section-g h))
                  (when (str/includes? sec "h") (section-h h))
                  nil))
+        (.then (fn [_] (when (str/includes? sec "k") (section-k))))
         (.catch (fn [e] (println "FAILED:" (.-message e)) (js/process.exit 2))))))
 
 (-main)
