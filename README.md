@@ -492,6 +492,18 @@ Two properties make sharing one db across callers safe, and both belong to
 2. **The db is a value**, so nothing handed out can be mutated into something
    the next caller sees.
 
+> **Sound for values, and it does not extend to counts.** Because
+> `materialize` takes no `visible?`, the scan that `max-datoms` bounds runs
+> over every document before any visibility decision exists — and the
+> refusal reports the running total it stopped at, in `ex-data`. A caller
+> that can read no value of a collection can still recover its exact datom
+> count (12 probes on the 3-arity), and the built-in ceiling discloses the
+> same quantity to a caller that names no cap at all. Measured, both
+> directions, in [`bench/inference-channel-01.edn`](bench/inference-channel-01.edn);
+> harness `bench/inference_channel.cljs`. Nothing here is proposed as a fix —
+> a bound on work is not a bound on disclosure, and which of the two this
+> should be is a decision, not a bug report.
+
 **The answer is never memoised** — only the index. A result memo would need
 `visible?` in its key, and keying on a function is how one principal ends up
 reading another's rows.
