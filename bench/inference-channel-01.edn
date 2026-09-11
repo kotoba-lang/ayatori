@@ -96,5 +96,5 @@ neither 0 nor 1) when its own control does not hold.
 - Dependencies resolved from this workspace's west checkouts, NOT from the
   shas `deps.edn` names - those objects were not present locally. The seam
   under test (`materialize`, `over-budget!`) is ayatori's own source.
-- Reproduce: `nbb --classpath \"src:<workspace src dirs>\"
+- Reproduce: `kbb --backend sci --classpath \"src:<workspace src dirs>\"
   bench/inference_channel.cljk`"}]

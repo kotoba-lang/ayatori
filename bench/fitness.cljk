@@ -21,7 +21,7 @@
 ;;      A packed read costs one range request. Both arms below answer the
 ;;      same query over the same snapshot, so the difference is transport.
 ;;
-;; Run: nbb --classpath "<the run_tests classpath>" bench/fitness.cljk
+;; Run: kbb --backend sci --classpath "<the run_tests classpath>" bench/fitness.cljk
 (ns fitness
   (:require [arrangement.core :as arr]
             [ipld.core :as ipld]

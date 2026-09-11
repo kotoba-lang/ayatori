@@ -1,4 +1,4 @@
-#!/usr/bin/env nbb
+#!/usr/bin/env kbb
 ;; scripts/measure-agent-validate.cljk -- what ayatori.agent/validate actually
 ;; refuses, by literal.
 ;;
@@ -18,7 +18,7 @@
 ;; Exit 0 = every probe answered what it predicted; 1 = at least one did not.
 ;;
 ;; Run (from the repo root):
-;;   nbb --classpath "src:." scripts/measure-agent-validate.cljk
+;;   kbb --backend sci --classpath "src:." scripts/measure-agent-validate.cljk
 ;;
 ;; ⚠ Measured 2026-09-10: 20 kotoba-lang repos renamed src/*.cljc to *.kotoba
 ;; that day. This entry is unaffected when nbb resolves kotoba.lang.text from

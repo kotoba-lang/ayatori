@@ -1,4 +1,4 @@
-#!/usr/bin/env nbb
+#!/usr/bin/env kbb
 ;; bench/commit_packs.cljk — Co-Scientist iteration 03: the write policy itself.
 ;;
 ;; Iteration 02 measured the many-pack regime by SPLITTING one snapshot into P
@@ -27,7 +27,7 @@
 ;; head and the harness exits 2 if they disagree.
 ;;
 ;; Run:
-;;   nbb --classpath "$(cat bin/classpath.txt)" bench/commit_packs.cljk
+;;   kbb --backend sci --classpath "$(cat bin/classpath.txt)" bench/commit_packs.cljk
 
 (ns commit-packs
   (:require [arrangement.core :as arr]

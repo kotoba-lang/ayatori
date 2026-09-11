@@ -1,4 +1,4 @@
-#!/usr/bin/env nbb
+#!/usr/bin/env kbb
 ;; bench/inference_channel.cljk — what a caller learns about data it cannot
 ;; read one value of.
 ;;
@@ -23,7 +23,7 @@
 ;; broken build).
 ;;
 ;; Run:
-;;   nbb --classpath "$(cat /path/to/cp.txt)" bench/inference_channel.cljk
+;;   kbb --backend sci --classpath "$(cat /path/to/cp.txt)" bench/inference_channel.cljk
 
 (ns inference-channel
   (:require [kotobase.local :as local]
