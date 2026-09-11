@@ -201,4 +201,10 @@
   :host-memory {:sut {:heap-used-mb 10954 :rss-mb 8476 :swap-used-pct 80.7 :page-ins 3804131}}
   :probe-p50-ms-at-rate-64 {:ic02 111.0 :ic09 86.1 :is2 25.1 :ic08 4.0}
   :receipt "kotobase-peer bench/results/2026-09-11-ldbc-snb-network-iteration-26-full-sf1-refused.edn"
-  :note "full SF1 loads, builds and passes the gate on the 16 GiB host and cannot be served resident: ~530 B per quad on this shape (the 2M-quad subset measured 337). The residency rule that let a 0.77 rss/heap SUT pass is 0.95 now (control: this SUT refused). M3's wall named: a host with ~24 GB free for this heap shape, or a smaller footprint"}]
+  :note "full SF1 loads, builds and passes the gate on the 16 GiB host and cannot be served resident: ~530 B per quad on this shape (the 2M-quad subset measured 337). The residency rule that let a 0.77 rss/heap SUT pass is 0.95 now (control: this SUT refused). M3's wall named: a host with ~24 GB free for this heap shape, or a smaller footprint"}
+ {:iteration 27 :date "2026-09-11" :benchmark :ldbc-snb-interactive-network-v2
+  :throughput-ops-s nil :verdict :measured-no-row
+  :footprint-bytes-per-quad-by-group {:names 483 :profile 473 :knows-plain 230 :knows-reified 491 :message-date 638 :message-content 478 :has-creator 453 :reply-of 472 :likes-reified 556}
+  :method "35k subset on simeon, ParallelGC, gc x3 between groups, live heap diff per group (bench/coscientist-iteration-27.edn)"
+  :full-sf1-extrapolation {:quads 20569957 :gb 10.3 :observed-used-heap-gb 10.9 :reified-edge-share 0.40}
+  :note "no throughput row: S17, where the ~530 B per quad go. Every group costs 450-640 B except plain knows (230, subjects shared); content strings are ~70 B of their 478. The cost is the three persistent index maps per quad, not the values. Reified edge properties (likes, knows dates) are 40% of full SF1's heap"}]
