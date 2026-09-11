@@ -40,7 +40,7 @@
     `:kotobase/key` -> `(str k)`. A doc in another collection that stores a
     foreign-key-shaped value (e.g. `{:dept-key \"d1\"}`) joins against the
     referenced entity via its `:kotobase/key` attribute -- see the worked
-    join example below and in `test/kotobase/query/bridge_test.cljc`.
+    join example below and in `test/kotobase/query/bridge_test.cljk`.
   - if `doc` is a map: every top-level `[attr v]` pair becomes a datom
     `{:s entity :p attr :o v}` -- `attr` is used AS-IS (whatever key shape
     the document actually used, typically a keyword; not coerced to a

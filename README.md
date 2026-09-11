@@ -284,7 +284,7 @@ before any request is issued.
 
 ### Measured against the per-object path
 
-`bench/fitness.cljs` answers the same query over the same snapshot through both
+`bench/fitness.cljk` answers the same query over the same snapshot through both
 paths and refuses (exit 2) if they ever disagree on the answer, so a cheaper arm
 cannot win by returning less. Counts, never wall clock — ADR-2608160100 sets the
 metric as round trips, and this repo is developed on a machine running many
@@ -340,7 +340,7 @@ parses.
 
 ## Public network benchmark
 
-`bin/network_bench.cljs` runs cold end-to-end samples against public
+`bin/network_bench.cljk` runs cold end-to-end samples against public
 `cid.contact` discovery and Kotobase's advertised HTTP provider. It uses the
 original raw CID from the advertisement corpus: IPNI indexes multihashes, so
 constructing a DAG-CBOR CID with the same digest would discover the same
@@ -360,8 +360,8 @@ snapshot or multi-block Datalog latency claims.
 
 ### Public persistent Arrangement snapshot
 
-`bin/build_public_snapshot.cljs` deterministically builds the multi-block
-fixture without network effects. `bin/public_arrangement_bench.cljs` then
+`bin/build_public_snapshot.cljk` deterministically builds the multi-block
+fixture without network effects. `bin/public_arrangement_bench.cljk` then
 opens its published snapshot cold and makes every block cross the full public
 path: cid.contact discovery, the returned Kotobase provider, SHA-256/CID
 verification, and the Worker-native Promise cursor. Kotobase's canonical IPLD
@@ -438,7 +438,7 @@ which no caller can tell from a query that matched nothing. `bridge/q` now
 throws on a non-map query instead of passing it through.
 
 **Pure, and depends on nothing** — not even on `bridge`. The caller owns the
-model call and the execution. That is what lets `run-tests-pure.cljs` gate it
+model call and the execution. That is what lets `run-tests-pure.cljk` gate it
 without the six-repo classpath the rest of the suite needs.
 
 Measured on 2026-08-18 (ADR-2608189300 in `com-junkawasaki/root`), twenty
@@ -500,7 +500,7 @@ Two properties make sharing one db across callers safe, and both belong to
 > count (12 probes on the 3-arity), and the built-in ceiling discloses the
 > same quantity to a caller that names no cap at all. Measured, both
 > directions, in [`bench/inference-channel-01.edn`](bench/inference-channel-01.edn);
-> harness `bench/inference_channel.cljs`. Nothing here is proposed as a fix —
+> harness `bench/inference_channel.cljk`. Nothing here is proposed as a fix —
 > a bound on work is not a bound on disclosure, and which of the two this
 > should be is a decision, not a bug report.
 
@@ -698,7 +698,7 @@ retired") and `arrangement`'s own README / ADR-2607050700 for the merge.
   strict parsing of advertised HTTP-gateway multiaddrs. `deps.edn`'s direct
   git dependencies resolve the complete chain automatically for
   the JVM `:test` alias via `tools.deps`; the nbb primary test path has no
-  dependency resolver, so `bin/run_tests.cljs`/CI clone every transitive
+  dependency resolver, so `bin/run_tests.cljk`/CI clone every transitive
   dep by hand — see Develop/test below.
 - [`kotoba-lang/io-ipni-specs`](https://github.com/kotoba-lang/io-ipni-specs) —
   provider discovery through Delegated Routing V1 and IPNI-native `/cid`.
@@ -715,7 +715,7 @@ for repo in text kotobase security arrangement prolly-tree io-ipld io-ipld-car \
   git clone "https://github.com/kotoba-lang/$repo" ".deps/$repo"
 done
 npm install
-nbb --classpath "$(cat bin/classpath.txt)" bin/run_tests.cljs
+nbb --classpath "$(cat bin/classpath.txt)" bin/run_tests.cljk
 ```
 
 The classpath is in `bin/classpath.txt` so there is one of it. Check each

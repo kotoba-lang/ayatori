@@ -1,5 +1,5 @@
 #!/usr/bin/env nbb
-;; bench/materialize_vs_cursor.cljs — Co-Scientist iteration 08.
+;; bench/materialize_vs_cursor.cljk — Co-Scientist iteration 08.
 ;;
 ;; Iterations 03-07 all measured ROUND TRIPS, and 07 closed by saying ratios are
 ;; the wrong unit and absolute trips are the right one. For the pack question it
@@ -27,7 +27,7 @@
 ;; A faster arm that returns different rows is not a faster arm.
 ;;
 ;; Run:
-;;   nbb --classpath "src:$(clojure -Spath)" bench/materialize_vs_cursor.cljs
+;;   nbb --classpath "src:$(clojure -Spath)" bench/materialize_vs_cursor.cljk
 
 (ns materialize-vs-cursor
   (:require [arrangement.core :as arr]

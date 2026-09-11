@@ -1,4 +1,4 @@
-;; bench/fitness.cljs — ayatori's deterministic fitness function.
+;; bench/fitness.cljk — ayatori's deterministic fitness function.
 ;;
 ;; The judge in a Co-Scientist loop has to be a measurement, or the loop is
 ;; theatre (ADR-2607132300: an LLM panel scored four libraries 4.0-5.0/5
@@ -21,7 +21,7 @@
 ;;      A packed read costs one range request. Both arms below answer the
 ;;      same query over the same snapshot, so the difference is transport.
 ;;
-;; Run: nbb --classpath "<the run_tests classpath>" bench/fitness.cljs
+;; Run: nbb --classpath "<the run_tests classpath>" bench/fitness.cljk
 (ns fitness
   (:require [arrangement.core :as arr]
             [ayatori.pack :as pack]

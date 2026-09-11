@@ -39,7 +39,7 @@ So this iteration counts ROWS DECRYPTED.
 
 ## Q. One snapshot, one query, two access paths
 
-`bench/materialize_vs_cursor.cljs`. Both arms answer the same query over the
+`bench/materialize_vs_cursor.cljk`. Both arms answer the same query over the
 same snapshot bytes, so a difference is the access path and nothing else. The
 result set is held FIXED at 5 subjects while the graph grows -- the point being
 that the live path's cost grows anyway.

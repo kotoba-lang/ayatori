@@ -1,5 +1,5 @@
 #!/usr/bin/env nbb
-;; scripts/measure-agent-validate.cljs -- what ayatori.agent/validate actually
+;; scripts/measure-agent-validate.cljk -- what ayatori.agent/validate actually
 ;; refuses, by literal.
 ;;
 ;; root 90-docs/security/privacy-threat-matrix.datoms.edn records the `agent`
@@ -18,7 +18,7 @@
 ;; Exit 0 = every probe answered what it predicted; 1 = at least one did not.
 ;;
 ;; Run (from the repo root):
-;;   nbb --classpath "src:." scripts/measure-agent-validate.cljs
+;;   nbb --classpath "src:." scripts/measure-agent-validate.cljk
 ;;
 ;; ⚠ Measured 2026-09-10: 20 kotoba-lang repos renamed src/*.cljc to *.kotoba
 ;; that day. This entry is unaffected when nbb resolves kotoba.lang.text from

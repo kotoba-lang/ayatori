@@ -30,7 +30,7 @@ so `apply-quad` was the obvious suspect: ~2500 quads, ~27s, about 10ms each.
 
 ## T. It is not apply-quad, measured twice
 
-`bench/assert_quad_shapes.cljs`. Swept by db size, then by VALUE SHAPE --
+`bench/assert_quad_shapes.cljk`. Swept by db size, then by VALUE SHAPE --
 because root ADR-2609051700's lesson is that a foundation library's constant
 lives in the codec, so a sweep that varies only COUNT can miss it entirely.
 

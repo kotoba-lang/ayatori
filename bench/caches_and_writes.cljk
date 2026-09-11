@@ -1,5 +1,5 @@
 #!/usr/bin/env nbb
-;; bench/caches_and_writes.cljs — Co-Scientist iteration 05. The three seeds
+;; bench/caches_and_writes.cljk — Co-Scientist iteration 05. The three seeds
 ;; iteration 04 left.
 ;;
 ;;   D  Hold the pack OPENS as well as the catalog. Iteration 04 predicted this
@@ -16,7 +16,7 @@
 ;; Round trips, never wall clock.
 ;;
 ;; Run:
-;;   SECTION=d|e|f nbb --classpath "$(cat bin/classpath.txt)" bench/caches_and_writes.cljs
+;;   SECTION=d|e|f nbb --classpath "$(cat bin/classpath.txt)" bench/caches_and_writes.cljk
 
 (ns caches-and-writes
   (:require [arrangement.core :as arr]

@@ -2,7 +2,7 @@
   :doc/id "ayatori-inference-channel-01"
   :doc/title "Inference channel 01 - the scan ceiling reports the cardinality it refused at, before visible? is consulted"
   :doc/path "bench/inference-channel-01.edn"
-  :doc/harness "bench/inference_channel.cljs"
+  :doc/harness "bench/inference_channel.cljk"
   :doc/measured-on "2026-09-10"
   :doc/body "# Inference channel 01 - what a caller learns about data it cannot read one value of
 
@@ -97,4 +97,4 @@ neither 0 nor 1) when its own control does not hold.
   shas `deps.edn` names - those objects were not present locally. The seam
   under test (`materialize`, `over-budget!`) is ayatori's own source.
 - Reproduce: `nbb --classpath \"src:<workspace src dirs>\"
-  bench/inference_channel.cljs`"}]
+  bench/inference_channel.cljk`"}]

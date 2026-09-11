@@ -91,4 +91,4 @@ jobs:
           node-version: 22
       - run: npm install --global nbb
       - run: npm install
-      - run: nbb --classpath "src:test:.deps/kotobase/src:.deps/arrangement/src:.deps/prolly-tree/src:.deps/io-ipld/src:.deps/io-ipld-car/src:.deps/io-multiformats/src:.deps/org-ietf-cbor/src:.deps/dev-protobuf/src:.deps/datom-source/src:.deps/datalog/src:.deps/io-ipni-specs/src:.deps/org-nist-sha2/src" bin/run_tests.cljs
+      - run: nbb --classpath "src:test:.deps/kotobase/src:.deps/arrangement/src:.deps/prolly-tree/src:.deps/io-ipld/src:.deps/io-ipld-car/src:.deps/io-multiformats/src:.deps/org-ietf-cbor/src:.deps/dev-protobuf/src:.deps/datom-source/src:.deps/datalog/src:.deps/io-ipni-specs/src:.deps/org-nist-sha2/src" bin/run_tests.cljk

@@ -12,7 +12,7 @@
 
 ## R. Same total quads, only the fold point moves, `limit 1`
 
-`bench/snapshot_vs_novelty.cljs`, against kotobase-peer's own `hot-datoms`:
+`bench/snapshot_vs_novelty.cljk`, against kotobase-peer's own `hot-datoms`:
 
     arm                            total  unfolded |  gets  decrypts  rows
     all folded (snapshot only)       400         0 |     4         1     1
