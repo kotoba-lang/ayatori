@@ -99,7 +99,12 @@
  ;; host past the swap threshold is refused by the driver (exit 2), and
  ;; host memory is written beside every row with the load average.
  :gate {:validity [:zero-failed-operations :on-time>=95% :answers-agree-with-reference :sut-resident]
-        :sut-resident "driver refuses when host swap-used exceeds --max-swap-pct (default 90); :host-memory (free, swap) is in every receipt"
+        ;; Amended 2026-09-11 after iteration 26: a full-SF1 SUT with 6.6 GB
+        ;; of its heap in swap passed the swap threshold (80.7%) and the old
+        ;; half-heap RSS rule, and answered IC02 at 111 ms against 3.4 ms
+        ;; resident. The SUT's own reading is judged: RSS below 0.95 x used
+        ;; heap means part of the heap is not in memory, and the run is refused.
+        :sut-resident "driver refuses when the SUT's (or, failing that, its own host's) swap-used exceeds --max-swap-pct (default 90), or when the SUT's RSS is below 0.95 x its used heap; :host-memory (heap used, RSS, swap) is in every receipt"
         :reference "kotobase-peer.ldbc-snb-bench asserts the four served reads equal Neo4j's on the same data; a rung adds operations only with a reference for each"
         :empty-answer-share :reported-on-every-row}
 
