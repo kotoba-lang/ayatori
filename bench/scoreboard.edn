@@ -74,4 +74,13 @@
   :next-rate-failed {:rate 768 :on-time-pct 21.71 :throughput-at-failure 618.2}
   :p50-ms {:ic02 12.1 :ic07 11.3 :ic08 10.9 :ic09 55.9}
   :target-ops-s 139411.14 :ratio-to-target 273 :verdict :growth
-  :note "same arm with 32 driver slots (the rtt was the 8-slot ceiling); 8.2x the Datalog reference. Inflight is a driver setting the sponsor picks (Huawei ran 64 read threads); recorded as its own column"}]
+  :note "same arm with 32 driver slots (the rtt was the 8-slot ceiling); 8.2x the Datalog reference. Inflight is a driver setting the sponsor picks (Huawei ran 64 read threads); recorded as its own column"}
+ {:iteration 17 :date "2026-09-11" :benchmark :ldbc-snb-interactive-network-v2
+  :rung :sf1-subset-35k-posts :origin :cross-host :mix [:ic02 :ic07 :ic08 :ic09] :inflight 8 :sut-threads 8 :impl :datalog
+  :rate 96 :throughput-ops-s 93.9 :on-time-pct 100.0 :failed 0 :empty-share 0.43
+  :next-rate-failed {:rate 128 :on-time-pct 19.22 :throughput-at-failure 99.3}
+  :p50-ms {:ic02 15.3 :ic07 13.7 :ic08 14.5 :ic09 293.1}
+  :target-ops-s 139411.14 :ratio-to-target 1485
+  :host-memory {:sut {:swap-used-pct 0.0}} :verdict :growth
+  :receipt "kotobase-peer bench/results/2026-09-11-ldbc-snb-network-iteration-17-planner-hint.edn"
+  :note "Datalog column 62.4 -> 93.9 (1.5x) with rung/origin/mix/inflight/impl held. Cause found in-process: an empty IC08 cost 61 ms vs 2.2 non-empty because the planner hint (input-substituted estimate 0) was read by the executor as a tiny relation and hash-joined a broad scan of 86,932 rows; hint now withheld for input-narrowed clauses. IC08 served 128 -> 14.5 ms; IC09 (all official parameters empty on this subset, ~164 ms each) is what is left"}]
