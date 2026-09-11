@@ -35,4 +35,10 @@
   :target-ops-s 139411.14 :ratio-to-target 1.8e4
   :load-avg ["12.60" "19.18" "21.08"] :verdict :baseline
   :receipt "kotobase-peer bench/results/2026-09-11-ldbc-snb-network-loopback-sf1-subset.edn"
-  :note "first row under v2; half the completed operations are empty answers because the subset keeps the most recent posts while official parameters span 2011-2012 -- a subset rung, not a score"}]
+  :note "first row under v2; half the completed operations are empty answers because the subset keeps the most recent posts while official parameters span 2011-2012 -- a subset rung, not a score"}
+ {:iteration 14 :date "2026-09-11" :benchmark :ldbc-snb-interactive-network-v2
+  :rung :sf1-subset :origin :loopback :mix [:ic02 :ic07 :ic08 :ic09]
+  :throughput-ops-s nil :verdict :refused-host
+  :host-memory {:swap-used-pct [80.1 97.8] :free-gib [0.23 0.44]} :load-avg ["20.41" "21.01" "23.46"]
+  :receipt "kotobase-peer bench/results/2026-09-11-ldbc-snb-network-iteration-14-paged-out-sut.edn"
+  :note "no valid throughput: the SUT JVMs were paged out (RSS 0.02 GB against 0.9 GB used heap). Mechanism receipt: IC08 1.9 ms in-process vs 96-310 ms served on the same data and var; person 2x, subset 1.4x, concurrency not the cause. Iteration 13's row was measured under the same condition and stands as :baseline-under-paging, not as a number about the engine. Driver now refuses above --max-swap-pct 90 and records :host-memory"}]
