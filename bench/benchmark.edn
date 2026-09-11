@@ -82,9 +82,16 @@
  ;; The audited table starts at SF30. We start where the data fits one JVM
  ;; and climb; every rung is a separate column. SF1 is not on the table and
  ;; is not compared against it -- it is where the mechanism is found.
+ ;; Amended 2026-09-11 after iteration 34: SF1 is served WHOLE and resident
+ ;; for the first time (datalog 645c9e58, one-value counterpart sets cost
+ ;; one object: 20.6M quads in 4.4 GB used heap on a 16 GiB host). The
+ ;; subset rung stays as its own column; the full rung is `:sf1-full`.
+ ;; SF3 is the next rung and, by the same bytes-per-quad, ~13 GB -- it
+ ;; needs a persisted plane or a larger host before it is a column.
  :scale {:ladder [1 3 10 30 100 300 1000]
          :first-audited-rung 30
-         :current-rung 1}
+         :current-rung 1
+         :sf1-rungs [:sf1-subset-35k-posts+profiles+knows-dates+forums :sf1-full]}
 
  ;; ── the gate ───────────────────────────────────────────────────────────────
  ;; A run with failed operations, or with fewer than 95% on-time starts, or

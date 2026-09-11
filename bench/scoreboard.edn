@@ -287,4 +287,14 @@
   :read-after-write {:checked 276 :not-visible 0 :outside-window 0 :unverifiable 84 :is6-checked 57 :no-covering-read 60}
   :target-ops-s 139411.14 :ratio-to-target 31 :verdict :growth
   :receipt "kotobase-peer bench/results/2026-09-11-ldbc-snb-network-iteration-33-all-inserts.edn"
-  :note "reads 3584 fails (42.1% on-time) so this is a ceiling. CORRECTION to iteration 32's 32-slot row: its sweep (2048,2560) ended on a passing rate, so 3371.6 was the last rate tried, not the highest passing rate; the ceiling under the it.32 stream was never measured"}]
+  :note "reads 3584 fails (42.1% on-time) so this is a ceiling. CORRECTION to iteration 32's 32-slot row: its sweep (2048,2560) ended on a passing rate, so 3371.6 was the last rate tried, not the highest passing rate; the ceiling under the it.32 stream was never measured"}
+ {:iteration 34 :date "2026-09-11" :benchmark :ldbc-snb-interactive-network-v2
+  :rung :sf1-full :origin :cross-host :path :lan :sut "levi" :driver "judah" :sut-heap "-Xmx10g" :quads 20569957
+  :mix [:ic02 :ic07 :ic08 :ic09 :is1 :is2 :is3 :is4 :is5 :is6 :is7 :stream] :stream {:tcr 0.0002 :types [:ins1 :ins2 :ins3 :ins4 :ins5 :ins6 :ins7 :ins8] :skipped-types []}
+  :inflight 8 :sut-threads 8 :impl :datalog :engine "datalog 645c9e58 (one-value counterpart sets cost one object)"
+  :rate 128 :updates-per-s 1092 :throughput-ops-s 1215.8 :on-time-pct 100.0 :failed 0
+  :sut-memory {:heap-used-mb 4357 :heap-max-mb 10240 :rss-mb 10661 :swap-used-pct 23.1}
+  :read-after-write {:checked 234 :not-visible 0 :outside-window 10 :unverifiable 0 :is6-checked 40 :no-covering-read 40}
+  :target-ops-s 139411.14 :ratio-to-target 115 :verdict :growth-by-rung
+  :receipt "kotobase-peer bench/results/2026-09-11-ldbc-snb-network-iteration-34-full-sf1.edn"
+  :note "FIRST ROW ON THE FULL SF1: 20.6M quads resident in 4.4 GB used heap (10.9 GB before datalog 645c9e58; subset 726 -> 386 MB with identical gate and latencies). reads 192 fails (91.7%), 32 slots at 256 fails (89.4%): no 32-slot row. Server p50 on the full data: ic02 141 ms, ic09 113, ic07 31, is2 28 -- the date-ordered reads are the next wall"}]
