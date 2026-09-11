@@ -235,4 +235,20 @@
   :p50-ms {:ic02 5.3 :ic07 4.2 :ic08 3.5 :ic09 9.6 :is1 3.6 :is2 5.7 :is3 10.0 :is4 3.6 :is5 3.6 :is6 3.7 :is7 3.7 :ins2 3.5 :ins8 3.5}
   :read-after-write {:checked 29 :not-visible 0 :unverifiable 91}
   :target-ops-s 139411.14 :ratio-to-target 37 :verdict :baseline
-  :note "32-slot column with writes; 95.50% on-time is a boundary pass"}]
+  :note "32-slot column with writes; 95.50% on-time is a boundary pass"}
+ {:iteration 31 :date "2026-09-11" :benchmark :ldbc-snb-interactive-network-v2
+  :rung :sf1-subset-35k-posts+profiles+knows-dates+forums :origin :cross-host :path :lan :sut "levi" :driver "judah"
+  :mix [:ic02 :ic07 :ic08 :ic09 :is1 :is2 :is3 :is4 :is5 :is6 :is7 :ins1 :ins2 :ins3 :ins6 :ins7 :ins8] :inflight 8 :sut-threads 8 :impl :datalog
+  :rate 2560 :throughput-ops-s 2536.0 :on-time-pct 100.0 :failed 0
+  :p50-ms {:ic02 3.8 :ic07 2.5 :ic08 2.2 :ic09 7.2 :is1 2.2 :is2 3.4 :is3 6.8 :is4 2.1 :is5 2.1 :is6 2.1 :is7 2.0 :ins1 1.9 :ins2 1.9 :ins3 1.9 :ins6 2.0 :ins7 2.0 :ins8 2.1}
+  :read-after-write {:checked 282 :not-visible 0 :outside-window 4 :unverifiable 78}
+  :target-ops-s 139411.14 :ratio-to-target 55 :verdict :growth
+  :receipt "kotobase-peer bench/results/2026-09-11-ldbc-snb-network-iteration-31-six-inserts.edn"
+  :note "mix 13 -> 17 of 29 (6 of 8 inserts) at higher throughput on the same slots (1960 -> 2536): growth by widening. Required datalog e75df8c2: the value order carried across writes and kept for sixteen versions -- without it IC02/IC09/IS2 were 34 ms (one version: 99 ms) under a write mix"}
+ {:iteration 31 :date "2026-09-11" :benchmark :ldbc-snb-interactive-network-v2
+  :rung :sf1-subset-35k-posts+profiles+knows-dates+forums :origin :cross-host :path :lan :sut "levi" :driver "judah"
+  :mix [:ic02 :ic07 :ic08 :ic09 :is1 :is2 :is3 :is4 :is5 :is6 :is7 :ins1 :ins2 :ins3 :ins6 :ins7 :ins8] :inflight 32 :sut-threads 8 :impl :datalog
+  :rate 4096 :throughput-ops-s 3827.4 :on-time-pct 96.60 :failed 0
+  :read-after-write {:checked 283 :not-visible 0 :outside-window 5 :unverifiable 77}
+  :target-ops-s 139411.14 :ratio-to-target 36 :verdict :growth
+  :note "32-slot column 3791 -> 3827 with four more inserts in the mix; 169,844 inserts applied by the SUT across the sweeps, heap 2.6 GB"}]
