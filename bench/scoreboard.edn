@@ -404,4 +404,14 @@
   :read-after-write {:checked 462 :not-visible 0 :outside-window 20 :unverifiable 0 :is6-checked 79 :no-covering-read 80}
   :target-ops-s 139411.14 :target-tcr 0.00315 :ratio-to-target 102 :verdict :new-column-official-schedule
   :receipt "kotobase-peer bench/results/2026-09-12-ldbc-snb-network-iteration-46.edn"
-  :note "FIRST ROW UNDER LDBC'S OWN SCHEDULE (per-query interleaves from the driver's sf1.properties, short reads following complex reads with dissipation 0.2 -- approximated): TCR 0.0002 passes at 100% / 1252.3, 0.00015 at 96.2% / 1360.9, 0.0001 fails (30.8%). IC05 admitted (5 of 14 IC). The uniform-schedule column (4631.8) stays a separate column"}]
+  :note "FIRST ROW UNDER LDBC'S OWN SCHEDULE (per-query interleaves from the driver's sf1.properties, short reads following complex reads with dissipation 0.2 -- approximated): TCR 0.0002 passes at 100% / 1252.3, 0.00015 at 96.2% / 1360.9, 0.0001 fails (30.8%). IC05 admitted (5 of 14 IC). The uniform-schedule column (4631.8) stays a separate column"}
+ {:iteration 47 :date "2026-09-12" :benchmark :ldbc-snb-interactive-network-v2 :schedule :official
+  :rung :sf1-full :origin :cross-host :path :lan :sut "levi" :driver "judah" :sut-heap "-Xmx10g -XX:-G1UseAdaptiveIHOP -XX:InitiatingHeapOccupancyPercent=75" :quads 25405564 :params :full-data
+  :mix [:ic02 :ic05 :ic07 :ic08 :ic09 :is1 :is2 :is3 :is4 :is5 :is6 :is7 :stream] :stream {:types [:ins1 :ins2 :ins3 :ins4 :ins5 :ins6 :ins7 :ins8] :skipped-types []}
+  :inflight 64 :sut-threads 16 :impl :datalog :engine "datalog 9c86cc8d (count pushdown); kotobase-peer f5d681fc (IC05 as one query)"
+  :tcr 0.00012 :updates-per-s 1901 :complex-per-s 158 :short-reads-per-s 150 :throughput-ops-s 1995.6 :on-time-pct 100.0 :failed 0
+  :gate {:checked 4780 :disagreements 0}
+  :read-after-write {:checked 477 :not-visible 0 :outside-window 20 :unverifiable 0 :is6-checked 78 :no-covering-read 80}
+  :target-ops-s 139411.14 :target-tcr 0.00315 :ratio-to-target 70 :verdict :growth
+  :receipt "kotobase-peer bench/results/2026-09-12-ldbc-snb-network-iteration-47.edn"
+  :note "official column 1360.9 -> 1995.6 (lowest passing TCR 0.00015 -> 0.00012; 0.0001 fails 89.0%): IC05 as one query with (count ?post) pushed into the (creator, forum) composite -- 161 -> 112 ms p50, max 2302 -> 388 over the 99 parameters"}]
