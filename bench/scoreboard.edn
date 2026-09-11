@@ -83,4 +83,14 @@
   :target-ops-s 139411.14 :ratio-to-target 1485
   :host-memory {:sut {:swap-used-pct 0.0}} :verdict :growth
   :receipt "kotobase-peer bench/results/2026-09-11-ldbc-snb-network-iteration-17-planner-hint.edn"
-  :note "Datalog column 62.4 -> 93.9 (1.5x) with rung/origin/mix/inflight/impl held. Cause found in-process: an empty IC08 cost 61 ms vs 2.2 non-empty because the planner hint (input-substituted estimate 0) was read by the executor as a tiny relation and hash-joined a broad scan of 86,932 rows; hint now withheld for input-narrowed clauses. IC08 served 128 -> 14.5 ms; IC09 (all official parameters empty on this subset, ~164 ms each) is what is left"}]
+  :note "Datalog column 62.4 -> 93.9 (1.5x) with rung/origin/mix/inflight/impl held. Cause found in-process: an empty IC08 cost 61 ms vs 2.2 non-empty because the planner hint (input-substituted estimate 0) was read by the executor as a tiny relation and hash-joined a broad scan of 86,932 rows; hint now withheld for input-narrowed clauses. IC08 served 128 -> 14.5 ms; IC09 (all official parameters empty on this subset, ~164 ms each) is what is left"}
+ {:iteration 18 :date "2026-09-11" :benchmark :ldbc-snb-interactive-network-v2
+  :rung :sf1-subset-35k-posts :origin :cross-host :mix [:ic02 :ic07 :ic08 :ic09] :inflight 8 :sut-threads 8 :impl :datalog
+  :rate 192 :throughput-ops-s 190.2 :on-time-pct 100.0 :failed 0 :empty-share 0.43
+  :next-rate-failed {:rate 256 :on-time-pct 16.31 :throughput-at-failure 197.9}
+  :p50-ms {:ic02 12.5 :ic07 13.7 :ic08 14.3 :ic09 109.2}
+  :answers-agree {:checked 392 :disagreements 0}
+  :target-ops-s 139411.14 :ratio-to-target 733
+  :host-memory {:sut {:swap-used-pct 0.0}} :verdict :growth
+  :receipt "kotobase-peer bench/results/2026-09-11-ldbc-snb-network-iteration-18-range-in-query.edn"
+  :note "Datalog column 93.9 -> 190.2 (2.0x) with everything held: date bound and top-20 written into IC02/IC09, on datalog da95b877 where a range on a bound entity is a keyed scan (before it, one walk of 86,932 values per bound message). IC09 109 ms is what remains: the two-hop join materialises before the range prunes"}]
