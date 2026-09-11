@@ -93,7 +93,13 @@
  ;; EMPTY answers: an empty answer is fast for the wrong reason (root
  ;; ADR-2609109900), and a subset of the data makes official parameters
  ;; empty; a rung whose empty share is not ~0 is a subset rung and says so.
- :gate {:validity [:zero-failed-operations :on-time>=95% :answers-agree-with-reference]
+ ;; Amended 2026-09-11 after iteration 14: the same IC08 was 1.9 ms
+ ;; in-process and 96-310 ms served with the SUT JVM paged out (host swap
+ ;; 34.5 of 35.8 GB). Load average did not show it; swap did. A run on a
+ ;; host past the swap threshold is refused by the driver (exit 2), and
+ ;; host memory is written beside every row with the load average.
+ :gate {:validity [:zero-failed-operations :on-time>=95% :answers-agree-with-reference :sut-resident]
+        :sut-resident "driver refuses when host swap-used exceeds --max-swap-pct (default 90); :host-memory (free, swap) is in every receipt"
         :reference "kotobase-peer.ldbc-snb-bench asserts the four served reads equal Neo4j's on the same data; a rung adds operations only with a reference for each"
         :empty-answer-share :reported-on-every-row}
 
@@ -109,7 +115,8 @@
           :held [:rung :origin :mix]
           :widening [:rung :mix]
           :rule "throughput strictly higher with rung/origin/mix held, or rung or mix widened at >= the previous throughput; else :no-growth or :trade with the price stated"
-          :load-avg :written-beside-every-row}
+          :load-avg :written-beside-every-row
+          :host-memory :written-beside-every-row}
 
  ;; ── current coverage, honestly ─────────────────────────────────────────────
  ;; The kotobase side today serves 4 of the 29 operations (IC02, IC07, IC08,
