@@ -31,7 +31,10 @@
 
   ## What this does instead
 
-  Enumerate `test/**/*_test.clj[cs]` on disk, let the entry `require` that
+  Enumerate `test/**/*_test.clj[csk]` on disk (`.cljk` since the 2026-09-11
+  rename, which this suite refused -- correctly -- until the glob learned the
+  new extension; the mirror on the classpath is what makes the require then
+  succeed), let the entry `require` that
   set at its top level, and run exactly it. There is no list to fall behind,
   because there is no list.
 
@@ -74,16 +77,16 @@
 (defn- file->ns [p]
   (-> p
       (str/replace #"^test[/\\]" "")
-      (str/replace #"\.clj[cs]$" "")
+      (str/replace #"\.clj[csk]$" "")
       (str/replace #"[/\\]" ".")
       (str/replace "_" "-")
       symbol))
 
 (defn test-namespaces
-  "Every `*_test.clj[cs]` under `test/`, as namespace symbols, sorted."
+  "Every `*_test.clj[csk]` under `test/`, as namespace symbols, sorted."
   []
   (->> (walk "test")
-       (filter #(re-find #"_test\.clj[cs]$" %))
+       (filter #(re-find #"_test\.clj[csk]$" %))
        (map file->ns)
        sort
        vec))
@@ -95,10 +98,10 @@
   (js/process.exit 2))
 
 (defn- test-files
-  "Every `*_test.clj[cs]` under `test/`, as paths, in the order
+  "Every `*_test.clj[csk]` under `test/`, as paths, in the order
   `test-namespaces` returns their namespaces."
   []
-  (->> (walk "test") (filter #(re-find #"_test\.clj[cs]$" %)) sort vec))
+  (->> (walk "test") (filter #(re-find #"_test\.clj[csk]$" %)) sort vec))
 
 (defn- declared-tests
   "`(deftest` forms at the start of a line. A form nested inside another --
@@ -144,7 +147,7 @@
   (let [nss (test-namespaces)
         files (test-files)]
     (when (zero? (count nss))
-      (refuse! "no *_test.clj[cs] under test/ --"
+      (refuse! "no *_test.clj[csk] under test/ --"
                "run this from the repo root with test/ on the classpath"))
     (let [unchecked (check-nothing-was-swallowed! files nss)]
       (println "SCANNED" (count nss) "test namespaces:" (str/join ", " nss))

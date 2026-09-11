@@ -156,3 +156,62 @@
                    (b/slice frame 0 (dec (b/bcount frame))) corrupt]]
       (is (thrown? #?(:clj Exception :cljs :default)
                    (pack/read-block (assoc p :fetch (constantly bytes)) (:cid entry)))))))
+
+;; ── Co-scientist iteration 11: the window ─────────────────────────────────────
+;;
+;; `:window` turns one exact range per block into one range forward from the
+;; located frame, with every whole frame in it cached. These pin what the
+;; bench relies on: the cache costs no request, the window never reads into
+;; the index, a frame outside the window still answers, and a pack that fits
+;; in the head window opens in ONE request.
+
+(defn- open-windowed [archive requests window]
+  (pack/open-pack
+   {:profile {:blocks :packed-blocks :object #{:range-read}}
+    :window window
+    :range-fn
+    (fn [{:keys [range]}]
+      (swap! requests conj range)
+      (let [[_ a z] (re-matches #"bytes=(\d+)-(\d*)" range)
+            parse #?(:clj #(Long/parseLong %) :cljs #(js/parseInt % 10))
+            start (parse a)
+            end (if (seq z) (inc (parse z)) (b/bcount archive))]
+        (b/slice archive start (min end (b/bcount archive)))))}))
+
+(deftest a-pack-that-fits-in-the-head-window-opens-in-one-request
+  (let [packed (fixture)
+        requests (atom [])
+        p (open-windowed (:bytes packed) requests (* 4 (b/bcount (:bytes packed))))
+        expected (:blocks (car2/read-all (:bytes packed)))]
+    (is (= 1 (count @requests)) "header, payload and index all arrived in the head window")
+    (doseq [{:keys [cid]} (:entries packed)]
+      (is (b/equal? (get expected cid) (pack/read-block p cid))))
+    (is (= 1 (count @requests)) "and no block read cost a request: every frame was in the cache")))
+
+(deftest a-window-smaller-than-the-pack-caches-what-it-holds-and-reads-forward-for-the-rest
+  (let [packed (fixture)
+        entries (:entries packed)
+        ;; head window: header + CARv1 header + the first frame only
+        window (+ (:file-offset (first entries)) (:frame-length (first entries)))
+        requests (atom [])
+        p (open-windowed (:bytes packed) requests window)
+        expected (:blocks (car2/read-all (:bytes packed)))]
+    (is (= 2 (count @requests)) "head window, then the index from the tail")
+    (is (b/equal? (get expected (:cid (first entries))) (pack/read-block p (:cid (first entries)))))
+    (is (= 2 (count @requests)) "the root came out of the head window's cache")
+    (is (b/equal? (get expected (:cid (second entries))) (pack/read-block p (:cid (second entries)))))
+    (is (= 3 (count @requests)) "the second frame was one window forward")
+    (let [[_ a z] (re-matches #"bytes=(\d+)-(\d*)" (last @requests))
+          parse #?(:clj #(Long/parseLong %) :cljs #(js/parseInt % 10))
+          end (inc (parse z))]
+      (is (<= end (+ (:data-offset packed) (:data-size packed)))
+          "and that window stopped at the payload end -- the index is never read as frames"))))
+
+(deftest without-a-window-the-exact-read-is-unchanged
+  ;; The control: `:window 0` is the reader iteration 01 measured.
+  (let [packed (fixture)
+        requests (atom [])
+        p (open (:bytes packed) requests)]
+    (is (= 2 (count @requests)))
+    (pack/read-block p (:cid (first (:entries packed))))
+    (is (= 3 (count @requests)) "one exact range per block, as before")))

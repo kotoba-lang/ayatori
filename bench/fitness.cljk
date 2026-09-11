@@ -24,6 +24,7 @@
 ;; Run: nbb --classpath "<the run_tests classpath>" bench/fitness.cljk
 (ns fitness
   (:require [arrangement.core :as arr]
+            [ipld.core :as ipld]
             [ayatori.pack :as pack]
             [ayatori.remote :as remote]
             [kotoba.lang.text :as str]
@@ -171,6 +172,74 @@
 
 (defn- fmt [& xs] (str/join (map (fn [[w v]] (.padStart (str v) w)) (partition 2 xs))))
 
+;; ── Co-scientist iteration 11: the window, and the order the pack was written in ──
+;;
+;; Root ADR-2609119000 predicts, BEFORE this ran: a window read over a pack in
+;; hash order does not reduce reads (it carries unrelated frames) and raises
+;; bytes; the same window over a pack written root-first, breadth-first, cuts
+;; the per-block term to the number of contiguous runs. The judge is the same:
+;; reads and bytes, and the rows must equal the other arms' or the harness
+;; exits 2.
+
+(defn- bfs-order
+  "Blocks in breadth-first order from the snapshot root: root, then its
+   children in link order, then theirs. Siblings end up adjacent, which is
+   the write-side locality Iceberg's sort and Paimon's sorted runs buy."
+  [{:keys [blocks snapshot-cid]}]
+  (loop [queue [snapshot-cid] seen #{} out []]
+    (if (empty? queue)
+      (into out (keep (fn [[cid bytes]] (when-not (seen cid) {:cid cid :bytes bytes})) @blocks))
+      (let [cid (first queue)]
+        (if (or (seen cid) (nil? (get @blocks cid)))
+          (recur (subvec queue 1) seen out)
+          (let [bytes (get @blocks cid)
+                links (try (ipld/links (ipld/decode bytes)) (catch :default _ []))]
+            (recur (into (subvec queue 1) links)
+                   (conj seen cid)
+                   (conj out {:cid cid :bytes bytes}))))))))
+
+(defn- hash-order [{:keys [blocks]}]
+  (mapv (fn [[cid bytes]] {:cid cid :bytes bytes}) @blocks))
+
+(defn- packed-window-arm
+  "The packed arm with `:window` set: one range forward from each located
+   frame, every whole frame in it cached. `order-fn` decides the pack's frame
+   order, which is the variable under test."
+  [{:keys [snapshot-cid] :as snap} label order-fn window]
+  (let [entries (order-fn snap)
+        archive (:bytes (car2/pack {:roots [snapshot-cid] :blocks entries}))
+        range-reads (atom 0) bytes (atom 0)
+        range-fn (fn [{:keys [range]}]
+                   (swap! range-reads inc)
+                   (let [[_ from to] (re-matches #"bytes=(\d+)-(\d*)" range)
+                         start (js/parseInt from 10)
+                         total (b/bcount archive)
+                         end (if (seq to) (min total (inc (js/parseInt to 10))) total)
+                         slice (b/slice archive start (min end total))]
+                     (swap! bytes + (b/bcount slice))
+                     slice))
+        p (pack/open-pack {:range-fn range-fn :window window
+                           :profile {:blocks :packed-blocks :object #{:range-read}}})
+        opened (remote/open-snapshot
+                {:snapshot-cid snapshot-cid
+                 :discover-fn (fn [cid] {:ok? true :cid cid :mutates-cid? false
+                                         :providers [{:plane :discovery :cid cid :peer "p"
+                                                      :addrs [] :mutates-cid? false}]})
+                 :fetch-fn (fn [_ _] nil)
+                 :block-source #(pack/read-block p %)
+                 :blind-fn blind :decrypt-fn crypto})
+        rows (remote/q opened query (constantly true))]
+    {:arm label :rows (count rows) :round-trips @range-reads
+     :reads @range-reads :bytes @bytes :archive-bytes (b/bcount archive)}))
+
+(def ^:private window-bytes
+  ;; 64 KiB by default; AYATORI_WINDOW overrides so the window-size sweep in
+  ;; iteration 11 is this one harness run four times rather than four copies.
+  (let [raw (aget js/process.env "AYATORI_WINDOW")
+        n (when raw (js/parseInt raw 10))]
+    (if (and n (pos? n)) n 65536)))
+(def ^:private window-rows (atom []))
+
 (defn -main []
   (println)
   (println "ayatori fitness — counted, not timed (ADR-2608160100)")
@@ -199,10 +268,22 @@
                                               7 (:reads a) 10 (:bytes a)
                                               12 (:round-trips b) 8 (:discoveries b)
                                               7 (:reads b) 10 (:bytes b)))
+                                (let [d1 (packed-window-arm snap "window/hash" hash-order window-bytes)
+                                      d2 (packed-window-arm snap "window/bfs" bfs-order window-bytes)]
+                                  (when-not (= 3 (:rows d1) (:rows d2))
+                                    (println "REFUSING: a window arm did not return the same 3 rows:"
+                                             (:rows d1) (:rows d2))
+                                    (js/process.exit 2))
+                                  (swap! window-rows conj [n b d1 d2]))
                                 (conj acc [n a b c])))))))))
        (js/Promise.resolve [])
        [50 100 200 400 800])
       (.then (fn [rs]
+               (println)
+               (println (str "iteration 11 -- window " window-bytes " bytes; reads and bytes, exact arm beside the two orderings"))
+               (println (fmt 7 "subj" 14 "|  exact-read" 10 "bytes" 16 "|  window/hash" 10 "bytes" 15 "|  window/bfs" 10 "bytes"))
+               (doseq [[n b d1 d2] @window-rows]
+                 (println (fmt 7 n 14 (:reads b) 10 (:bytes b) 16 (:reads d1) 10 (:bytes d1) 15 (:reads d2) 10 (:bytes d2))))
                (println)
                (let [[n0 a0 _] (first rs) [n1 a1 b1 c1] (last rs)]
                  (println (str "scaling: database grew " (/ (* 2 n1) (* 2 n0)) "x, "

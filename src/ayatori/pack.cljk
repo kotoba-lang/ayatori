@@ -160,6 +160,8 @@
                      :frame-length (- (get ends payload-offset) payload-offset)))
           (sort-by :payload-offset index))))
 
+(declare frames-in-window)
+
 (defn open-pack
   "Read a pack's header and index, and return a handle for block reads.
 
@@ -170,7 +172,7 @@
   Costs two range reads regardless of how many blocks are later read out of
   the pack. `:reads` counts every range request this handle has issued, so a
   caller can assert round trips rather than assume them."
-  [{:keys [range-fn profile read-ahead max-index-bytes]
+  [{:keys [range-fn profile read-ahead max-index-bytes window]
     :or {max-index-bytes max-index-bytes}}]
   (when-not (fn? range-fn)
     (throw (ex-info "ayatori: range-fn is required"
@@ -183,9 +185,19 @@
                     (throw (ex-info "ayatori: range read returned no bytes"
                                     {:type :ayatori/empty-range-response
                                      :range range-value}))))
-        head-bytes (fetch (str "bytes=0-" (dec header-bytes)))
+        ;; H1c (iteration 11): with a window, the FIRST read is the head
+        ;; window rather than the 51-byte header. The header is at its front,
+        ;; the root frame is usually right behind it, and a pack that fits in
+        ;; the window arrives whole -- index included -- in that one request.
+        ;; Without a window, the exact 51 bytes, as before.
+        head-bytes (fetch (if (pos? (or window 0))
+                            (str "bytes=0-" (dec window))
+                            (str "bytes=0-" (dec header-bytes))))
         header (validate-header! (car2/parse-header head-bytes))
-        index-offset (:index-offset header)]
+        index-offset (:index-offset header)
+        payload-end (+ (:data-offset header) (:data-size header))
+        whole? (and (pos? (or window 0))
+                    (>= (b/bcount head-bytes) (+ index-offset 1)))]
     (when-not (pos? index-offset)
       (throw (ex-info (str "ayatori: this CARv2 carries no index (index-offset "
                            "0), so a block cannot be located without reading "
@@ -202,8 +214,11 @@
     ;; archive -- is then an unbounded read that no downstream check can undo.
     ;; A short response is fine: `idx/decode` refuses a truncated index rather
     ;; than returning the empty one it cannot distinguish from a real answer.
-    (let [index-body (fetch (str "bytes=" index-offset "-"
-                                 (+ index-offset max-index-bytes -1)))
+    (let [index-body (if whole?
+                       ;; the index is already in hand: no second request
+                       (b/slice head-bytes index-offset (b/bcount head-bytes))
+                       (fetch (str "bytes=" index-offset "-"
+                                   (+ index-offset max-index-bytes -1))))
           _ (when (> (b/bcount index-body) max-index-bytes)
               (throw (ex-info (str "ayatori: index read exceeded "
                                    max-index-bytes " bytes -- the store "
@@ -217,6 +232,24 @@
        :bounded (bounded-index header index)
        :reads reads
        :read-ahead (or read-ahead default-read-ahead)
+       ;; Co-scientist iteration 11 (root ADR-2609119000). `:window` > 0 turns
+       ;; `read-block` from one exact range per block into one range of
+       ;; `window` bytes forward from the located frame, every whole frame in
+       ;; it verified and cached, later reads served from the cache. 0 keeps
+       ;; the exact read. Whether the window pays depends on the ORDER the
+       ;; pack was written in, which is the hypothesis this exists to test.
+       :window (or window 0)
+       ;; Pre-filled from the head window: every whole frame between the
+       ;; CARv1 header and the end of the payload that the first read held.
+       :cache (atom (if (pos? (or window 0))
+                      (let [{hlen :value hvl :length} (b/read-varint head-bytes (:data-offset header))
+                            first-frame (+ (:data-offset header) hvl hlen)
+                            end (min (b/bcount head-bytes) payload-end)]
+                        (if (< first-frame end)
+                          (frames-in-window (b/slice head-bytes first-frame end))
+                          {}))
+                      {}))
+       :payload-end payload-end
        :fetch fetch})))
 
 (defn- locations [{:keys [bounded]} cid]
@@ -237,8 +270,41 @@
   [pack cid]
   (first (locations pack cid)))
 
+(defn- frames-in-window
+  "Every WHOLE frame in `body`, each verified by `ipld.car.v2/read-frame`, as
+   `{cid-string bytes}`. Stops at the first frame the window does not fully
+   hold -- a window cut at an arbitrary byte ends mid-frame almost always,
+   and that partial frame is where the next window starts, not an error."
+  [body]
+  (loop [off 0 acc {}]
+    (if (>= off (b/bcount body))
+      acc
+      (let [r (try (car2/read-frame body off)
+                   (catch :default e
+                     (if (= :car/frame-truncated (:type (ex-data e))) nil (throw e))))]
+        (if r
+          (recur (+ off (:frame-length r)) (assoc acc (str (:cid r)) (:bytes r)))
+          acc)))))
+
+(defn- read-window!
+  "One range of `window` bytes forward from `loc`, bounded by the payload end
+   so the index is never read as if it were frames. Fills the cache and
+   returns it."
+  [{:keys [fetch cache payload-end window]} loc]
+  (let [start (:file-offset loc)
+        end (min payload-end (+ start window))
+        body (fetch (str "bytes=" start "-" (dec end)))
+        bounded (b/slice body 0 (min (b/bcount body) (- end start)))]
+    (swap! cache merge (frames-in-window bounded))
+    @cache))
+
 (defn read-block
   "Read one block out of an opened pack, verifying the requested full CID.
+
+  With `:window` set on the handle, the first read for a frame pulls `window`
+  bytes forward from it and caches every whole frame that came along; a
+  later `read-block` for one of those costs no request. Without it, one
+  exact range per block, as before.
 
   Normally costs one range request. Multiple codec aliases for the same
   multihash may require trying multiple distinct indexed offsets.
@@ -248,8 +314,16 @@
   fall back to the per-object path. `ipld.car.v2/read-frame` verifies the CID
   of whatever frame it parses, so bytes returned here have already been
   checked against the identity the index claimed."
-  [{:keys [fetch] :as pack} cid]
-  (loop [candidates (locations pack cid) found nil]
+  [{:keys [fetch window cache] :as pack} cid]
+  (if (and (pos? (or window 0)))
+    ;; Windowed: cache first, else one window forward from the first
+    ;; candidate, then the cache again. A cid the window still does not hold
+    ;; falls through to the exact read below -- the window is an accelerator.
+    (or (get @cache (str cid))
+        (when-let [loc (locate pack cid)]
+          (get (read-window! pack loc) (str cid)))
+        (read-block (assoc pack :window 0) cid))
+    (loop [candidates (locations pack cid) found nil]
     (if-let [loc (first candidates)]
       (let [body (fetch (car2/range-header loc))
             ;; Even an overlong response cannot extend the index/payload bound.
@@ -263,7 +337,7 @@
       (when found
         (throw (ex-info "ayatori: pack index pointed at a different block"
                         {:type :ayatori/pack-index-mismatch
-                         :wanted (str cid) :found (str found)}))))))
+                         :wanted (str cid) :found (str found)})))))))
 
 (defn pack-fetcher
   "A `fetch-fn` for `ayatori.remote/provider-block-getter`, backed by a pack.
