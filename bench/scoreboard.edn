@@ -168,4 +168,22 @@
   :answers-agree {:reference "Neo4j embedded, paired in one JVM on simeon" :per-op {:ic02 98 :ic07 98 :ic08 98 :ic09 98 :is2 98 :is4 99 :is5 99 :is7 99} :disagreements 0}
   :paired-p50-ratio-kotobase-over-neo4j {:ic02 0.28 :ic07 1.31 :ic08 2.32 :ic09 0.85}
   :receipt "kotobase-peer bench/results/2026-09-11-ldbc-paired-neo4j-all-parameters-with-short-reads.edn"
-  :note "no new throughput row; this row closes the reference gap the iteration 22 rows stated: every served read now agrees with Neo4j on every official parameter and the subset's short-read messages. Paired in-process, kotobase is ahead of embedded Neo4j on IC02 (3.6x) and IC09 (1.2x) -- 2026-08-14 had 3.07 and 7.38 the other way"}]
+  :note "no new throughput row; this row closes the reference gap the iteration 22 rows stated: every served read now agrees with Neo4j on every official parameter and the subset's short-read messages. Paired in-process, kotobase is ahead of embedded Neo4j on IC02 (3.6x) and IC09 (1.2x) -- 2026-08-14 had 3.07 and 7.38 the other way"}
+ {:iteration 24 :date "2026-09-11" :benchmark :ldbc-snb-interactive-network-v2
+  :rung :sf1-subset-35k-posts+profiles+knows-dates+forums :quads 2004832 :origin :cross-host :path :lan
+  :mix [:ic02 :ic07 :ic08 :ic09 :is1 :is2 :is3 :is4 :is5 :is6 :is7] :inflight 8 :sut-threads 8 :impl :datalog
+  :rate 2048 :throughput-ops-s 2047.5 :on-time-pct 100.0 :failed 0 :rows-mean 49.6
+  :next-rate-failed {:rate 2560 :on-time-pct 34.67}
+  :p50-ms {:ic02 3.8 :ic07 2.4 :ic08 2.1 :ic09 6.6 :is1 2.2 :is2 3.5 :is3 6.7 :is4 2.1 :is5 2.1 :is6 2.1 :is7 2.0}
+  :answers-agree {:checked 1082 :disagreements 0 :reference "Neo4j on every parameter, 11 ops"}
+  :target-ops-s 139411.14 :ratio-to-target 68 :verdict :trade
+  :receipt "kotobase-peer bench/results/2026-09-11-ldbc-snb-network-iteration-24-eleven-operations.edn"
+  :note "mix 8 -> 11 of 29 at LOWER throughput than the 8-op column on the same slots (2941 -> 2047): the price is IS3's ~100-row answers (rows-mean 8.3 -> 49.6) at 6.7 ms, one operation in eleven. Footprint measured live: 337 B per quad (the ~1.6 KB quoted earlier was used heap with garbage) -- full SF1 fits the fleet host"}
+ {:iteration 24 :date "2026-09-11" :benchmark :ldbc-snb-interactive-network-v2
+  :rung :sf1-subset-35k-posts+profiles+knows-dates+forums :quads 2004832 :origin :cross-host :path :lan
+  :mix [:ic02 :ic07 :ic08 :ic09 :is1 :is2 :is3 :is4 :is5 :is6 :is7] :inflight 32 :sut-threads 8 :impl :datalog
+  :rate 4096 :throughput-ops-s 4088.9 :on-time-pct 100.0 :failed 0
+  :next-rate-failed {:rate 4608 :on-time-pct 53.32 :throughput-at-failure 4242.6}
+  :p50-ms {:ic02 7.1 :ic07 5.8 :ic08 5.5 :ic09 11.2 :is1 5.6 :is2 7.3 :is3 11.9 :is4 5.6 :is5 5.5 :is6 5.4 :is7 5.4}
+  :target-ops-s 139411.14 :ratio-to-target 34 :verdict :trade
+  :note "32-slot column 5118 -> 4089 with the wider mix; SUT ceiling on this mix ~4,250 delivered"}]
