@@ -1,4 +1,4 @@
-#!/usr/bin/env nbb
+#!/usr/bin/env kbb
 ;; scripts/measure-agent-execution-reach.cljk -- does a query that PASSED
 ;; ayatori.agent/validate reach execution with no authority check between?
 ;;
@@ -13,7 +13,7 @@
 ;; printed. If they differ, the seam works and the adapter is holding it open.
 ;;
 ;; Run (needs the workspace checkouts on the classpath, for datalog.core):
-;;   nbb --classpath "src:<workspace src dirs>" scripts/measure-agent-execution-reach.cljk
+;;   kbb --backend sci --classpath "src:<workspace src dirs>" scripts/measure-agent-execution-reach.cljk
 
 (ns measure-agent-to-execution
   "Second half of the `agent` plane measurement: does a query that PASSED

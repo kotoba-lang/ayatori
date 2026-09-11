@@ -1,4 +1,4 @@
-#!/usr/bin/env nbb
+#!/usr/bin/env kbb
 ;; bench/snapshot_vs_novelty.cljk — Co-Scientist iteration 09, seed 1 of 08.
 ;;
 ;; Iteration 08 measured materialize (O(database)) against cursor (O(result))
@@ -9,7 +9,7 @@
 ;; Same total quads in both arms. Only the fold point moves. A `limit 1` read.
 ;;
 ;; Run:
-;;   nbb --classpath "src:$(clojure -Spath)" bench/snapshot_vs_novelty.cljk
+;;   kbb --backend sci --classpath "src:$(kbb -Spath)" bench/snapshot_vs_novelty.cljk
 ;;
 ;; NOTE: this benches kotobase-peer, not ayatori, because the question is which
 ;; half of ITS read path costs. It lives here because it is the measurement

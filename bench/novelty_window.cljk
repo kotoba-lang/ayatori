@@ -1,4 +1,4 @@
-#!/usr/bin/env nbb
+#!/usr/bin/env kbb
 ;; bench/novelty_window.cljk — Co-Scientist iteration 06. The seed iteration 05
 ;; left with a number in it: build the READ-locality pack.
 ;;
@@ -57,7 +57,7 @@
 ;; Round trips, never wall clock.
 ;;
 ;; Run:
-;;   nbb --classpath "$(cat bin/classpath.txt)" bench/novelty_window.cljk
+;;   kbb --backend sci --classpath "$(cat bin/classpath.txt)" bench/novelty_window.cljk
 ;;   SECTION=g|h|k to run one.
 
 (ns novelty-window

@@ -1,4 +1,4 @@
-#!/usr/bin/env nbb
+#!/usr/bin/env kbb
 ;; bench/hyakka_pack.cljk — Co-Scientist iteration 02, second arm: the same
 ;; question against a REAL corpus instead of a synthetic one.
 ;;
@@ -16,7 +16,7 @@
 ;; be this file's author choosing the block sizes that decide the answer.
 ;;
 ;; Run:
-;;   nbb --classpath "$(cat bin/classpath.txt)" bench/hyakka_pack.cljk
+;;   kbb --backend sci --classpath "$(cat bin/classpath.txt)" bench/hyakka_pack.cljk
 
 (ns hyakka-pack
   (:require ["node:fs" :as fs]

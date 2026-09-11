@@ -1,4 +1,4 @@
-#!/usr/bin/env nbb
+#!/usr/bin/env kbb
 ;; bench/materialize_vs_cursor.cljk — Co-Scientist iteration 08.
 ;;
 ;; Iterations 03-07 all measured ROUND TRIPS, and 07 closed by saying ratios are
@@ -27,7 +27,7 @@
 ;; A faster arm that returns different rows is not a faster arm.
 ;;
 ;; Run:
-;;   nbb --classpath "src:$(clojure -Spath)" bench/materialize_vs_cursor.cljk
+;;   kbb --backend sci --classpath "src:$(kbb -Spath)" bench/materialize_vs_cursor.cljk
 
 (ns materialize-vs-cursor
   (:require [arrangement.core :as arr]

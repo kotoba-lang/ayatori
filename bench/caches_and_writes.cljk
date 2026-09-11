@@ -1,4 +1,4 @@
-#!/usr/bin/env nbb
+#!/usr/bin/env kbb
 ;; bench/caches_and_writes.cljk — Co-Scientist iteration 05. The three seeds
 ;; iteration 04 left.
 ;;
@@ -16,7 +16,7 @@
 ;; Round trips, never wall clock.
 ;;
 ;; Run:
-;;   SECTION=d|e|f nbb --classpath "$(cat bin/classpath.txt)" bench/caches_and_writes.cljk
+;;   SECTION=d|e|f kbb --backend sci --classpath "$(cat bin/classpath.txt)" bench/caches_and_writes.cljk
 
 (ns caches-and-writes
   (:require [arrangement.core :as arr]

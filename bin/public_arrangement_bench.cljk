@@ -1,4 +1,4 @@
-#!/usr/bin/env nbb
+#!/usr/bin/env kbb
 (ns public-arrangement-bench
   "Cold public-network proof over a real multi-block Arrangement snapshot.
   Every block is discovered independently through cid.contact, fetched from

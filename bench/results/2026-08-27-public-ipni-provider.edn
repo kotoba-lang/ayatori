@@ -2,7 +2,7 @@
  :measured-at "2026-08-27T07:07:37.090Z"
  :host {:os "macOS 26.3.1" :arch :arm64 :cpu "Apple M4"
         :runtime "Node v26.7.0"}
- :command "AYATORI_NORMAL_SAMPLES=20 AYATORI_FAILURE_SAMPLES=10 AYATORI_ALIAS_SAMPLES=5 nbb --classpath <pinned-dependencies> bin/network_bench.cljk"
+ :command "AYATORI_NORMAL_SAMPLES=20 AYATORI_FAILURE_SAMPLES=10 AYATORI_ALIAS_SAMPLES=5 kbb --backend sci --classpath <pinned-dependencies> bin/network_bench.cljk"
  :public-indexer "https://cid.contact/routing/v1"
  :successful-cid "bafkreia2cc444k5yrw57uhszfrvbri7wee3ljbpb5wfcorykk72kgxhjaq"
  :successful-block-bytes 78054

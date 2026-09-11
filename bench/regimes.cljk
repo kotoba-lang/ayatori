@@ -1,4 +1,4 @@
-#!/usr/bin/env nbb
+#!/usr/bin/env kbb
 ;; bench/regimes.cljk — Co-Scientist iteration 04. All three seeds iteration 03
 ;; left, in one harness because they share it.
 ;;
@@ -14,7 +14,7 @@
 ;; Round trips, never wall clock. Every section states its own gate.
 ;;
 ;; Run:
-;;   nbb --classpath "$(cat bin/classpath.txt)" bench/regimes.cljk
+;;   kbb --backend sci --classpath "$(cat bin/classpath.txt)" bench/regimes.cljk
 
 (ns regimes
   (:require [arrangement.core :as arr]

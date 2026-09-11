@@ -715,7 +715,7 @@ for repo in text kotobase security arrangement prolly-tree io-ipld io-ipld-car \
   git clone "https://github.com/kotoba-lang/$repo" ".deps/$repo"
 done
 npm install
-nbb --classpath "$(cat bin/classpath.txt)" bin/run_tests.cljk
+kbb --backend sci --classpath "$(cat bin/classpath.txt)" bin/run_tests.cljk
 ```
 
 The classpath is in `bin/classpath.txt` so there is one of it. Check each

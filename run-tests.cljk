@@ -7,7 +7,7 @@
   behaviour), so the `.cljc` extension alone is not grounds for a second
   gate -- a matching measurement is.
 
-      npx nbb --classpath src:test:<deps> run-tests.cljk
+      kbb --backend sci --classpath src:test:<deps> run-tests.cljk
 
   ## What changed here, and why (2026-09-04)
 

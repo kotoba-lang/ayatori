@@ -7,7 +7,7 @@
   check that fabricated attributes and unwrapped predicates are refused can
   run anywhere with:
 
-      npx nbb --classpath src:test run-tests-pure.cljk
+      kbb --backend sci --classpath src:test run-tests-pure.cljk
 
   ⚠ This entry names its namespaces in `:require`, so a future
   dependency-free test namespace that is not added here would be silently

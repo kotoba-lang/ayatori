@@ -1,4 +1,4 @@
-#!/usr/bin/env nbb
+#!/usr/bin/env kbb
 (ns build-public-snapshot
   "Build the deterministic Arrangement fixture used by the public IPNI
   benchmark. This performs no network writes: every CID-addressed block and a

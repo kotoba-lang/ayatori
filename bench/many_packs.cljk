@@ -1,4 +1,4 @@
-#!/usr/bin/env nbb
+#!/usr/bin/env kbb
 ;; bench/many_packs.cljk — Co-Scientist iteration 02, the regime iteration 01
 ;; named as unmeasured: "the interesting regime is where a query touches many
 ;; packs".
@@ -24,7 +24,7 @@
 ;; whether it holds.
 ;;
 ;; Run:
-;;   nbb --classpath "$(cat bin/classpath.txt)" bench/many_packs.cljk
+;;   kbb --backend sci --classpath "$(cat bin/classpath.txt)" bench/many_packs.cljk
 
 (ns many-packs
   (:require [arrangement.core :as arr]
