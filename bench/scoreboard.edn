@@ -251,4 +251,22 @@
   :rate 4096 :throughput-ops-s 3827.4 :on-time-pct 96.60 :failed 0
   :read-after-write {:checked 283 :not-visible 0 :outside-window 5 :unverifiable 77}
   :target-ops-s 139411.14 :ratio-to-target 36 :verdict :growth
-  :note "32-slot column 3791 -> 3827 with four more inserts in the mix; 169,844 inserts applied by the SUT across the sweeps, heap 2.6 GB"}]
+  :note "32-slot column 3791 -> 3827 with four more inserts in the mix; 169,844 inserts applied by the SUT across the sweeps, heap 2.6 GB"}
+ {:iteration 32 :date "2026-09-11" :benchmark :ldbc-snb-interactive-network-v2
+  :rung :sf1-subset-35k-posts+profiles+knows-dates+forums :origin :cross-host :path :lan :sut "levi" :driver "judah"
+  :mix [:ic02 :ic07 :ic08 :ic09 :is1 :is2 :is3 :is4 :is5 :is6 :is7 :stream] :stream {:tcr 0.0002 :types [:ins1 :ins2 :ins3 :ins6 :ins7 :ins8] :skipped-types [:ins4 :ins5]}
+  :inflight 8 :sut-threads 8 :impl :datalog
+  :rate 1536 :updates-per-s 595 :throughput-ops-s 2130.2 :on-time-pct 100.0 :failed 0
+  :read-after-write {:checked 184 :not-visible 0 :outside-window 16 :unverifiable 50}
+  :target-ops-s 139411.14 :ratio-to-target 65 :verdict :growth-by-shape
+  :receipt "kotobase-peer bench/results/2026-09-11-ldbc-snb-network-iteration-32-interleave.edn"
+  :note "first row where inserts follow the stream's simulation time under a TCR with the dependency rule (an event waits for every smaller sim time to complete); skipped INS4/INS5 are counted beside completed and excluded from throughput"}
+ {:iteration 32 :date "2026-09-11" :benchmark :ldbc-snb-interactive-network-v2
+  :rung :sf1-subset-35k-posts+profiles+knows-dates+forums :origin :cross-host :path :lan :sut "levi" :driver "judah"
+  :mix [:ic02 :ic07 :ic08 :ic09 :is1 :is2 :is3 :is4 :is5 :is6 :is7 :stream] :stream {:tcr 0.00015 :types [:ins1 :ins2 :ins3 :ins6 :ins7 :ins8] :skipped-types [:ins4 :ins5]}
+  :inflight 32 :sut-threads 8 :impl :datalog
+  :rate 2560 :updates-per-s 813 :throughput-ops-s 3371.6 :on-time-pct 100.0 :failed 0
+  :read-after-write {:checked 184 :not-visible 0 :outside-window 10 :unverifiable 56}
+  :target-ops-s 139411.14 :ratio-to-target 41 :verdict :growth-by-shape
+  :receipt "kotobase-peer bench/results/2026-09-11-ldbc-snb-network-iteration-32-interleave.edn"
+  :note "32-slot column 3827 (fixed-share, it.31) -> 3372 under the interleave: the dependency rule costs read headroom; control at TCR 0.0001 = 87.46% on-time (fails the rule, not a row)"}]
