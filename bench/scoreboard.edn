@@ -41,4 +41,15 @@
   :throughput-ops-s nil :verdict :refused-host
   :host-memory {:swap-used-pct [80.1 97.8] :free-gib [0.23 0.44]} :load-avg ["20.41" "21.01" "23.46"]
   :receipt "kotobase-peer bench/results/2026-09-11-ldbc-snb-network-iteration-14-paged-out-sut.edn"
-  :note "no valid throughput: the SUT JVMs were paged out (RSS 0.02 GB against 0.9 GB used heap). Mechanism receipt: IC08 1.9 ms in-process vs 96-310 ms served on the same data and var; person 2x, subset 1.4x, concurrency not the cause. Iteration 13's row was measured under the same condition and stands as :baseline-under-paging, not as a number about the engine. Driver now refuses above --max-swap-pct 90 and records :host-memory"}]
+  :note "no valid throughput: the SUT JVMs were paged out (RSS 0.02 GB against 0.9 GB used heap). Mechanism receipt: IC08 1.9 ms in-process vs 96-310 ms served on the same data and var; person 2x, subset 1.4x, concurrency not the cause. Iteration 13's row was measured under the same condition and stands as :baseline-under-paging, not as a number about the engine. Driver now refuses above --max-swap-pct 90 and records :host-memory"}
+ {:iteration 15 :date "2026-09-11" :benchmark :ldbc-snb-interactive-network-v2
+  :rung :sf1-subset-35k-posts :origin :cross-host :mix [:ic02 :ic07 :ic08 :ic09] :inflight 8 :sut-threads 8
+  :sut "simeon (fleet mac-mini, 10 cores, 16 GiB, swap off)" :path "Tailscale rtt ~14 ms"
+  :rate 64 :throughput-ops-s 63.1 :on-time-pct 100.0 :failed 0 :empty-share 0.44 :rows-mean 8.1
+  :next-rate-failed {:rate 96 :on-time-pct 12.29 :throughput-at-failure 63.5}
+  :p50-ms {:ic02 16.5 :ic07 14.8 :ic08 130.5 :ic09 295.7}
+  :target-ops-s 139411.14 :ratio-to-target 2.2e3
+  :host-memory {:sut {:swap-used-pct 0.0 :rss-mb 4609 :heap-used-mb 3133} :driver {:swap-used-pct 91.7}}
+  :load-avg {:sut ["4.23" "2.68" "2.23"] :driver ["9.51" "10.42" "15.42"]} :verdict :baseline
+  :receipt "kotobase-peer bench/results/2026-09-11-ldbc-snb-network-cross-host-simeon-sf1-subset.edn"
+  :note "first valid row (resident SUT). Ceiling is 8 slots over ~112 ms mean latency; 32 slots move the queue into the SUT without moving the ceiling (69.6 at rate 96), SUT JVM at 284% CPU with 8 threads -- not CPU-bound at saturation. 8.1x iteration 13, which measured paging at a different origin"}]
