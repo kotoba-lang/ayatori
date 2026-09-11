@@ -145,4 +145,20 @@
   :next-rate-failed {:rate 4096 :on-time-pct 27.54 :throughput-at-failure 3466.0}
   :p50-ms {:ic02 8.7 :ic07 7.4 :ic08 7.1 :ic09 12.9}
   :target-ops-s 139411.14 :ratio-to-target 40 :verdict :baseline
-  :note "the SUT's own ceiling: ~3,470-3,510 ops/s delivered at 32 and 64 slots with 27-33% on-time; 8 server threads on 10 cores, ~2.3 ms of server time per operation"}]
+  :note "the SUT's own ceiling: ~3,470-3,510 ops/s delivered at 32 and 64 slots with 27-33% on-time; 8 server threads on 10 cores, ~2.3 ms of server time per operation"}
+ {:iteration 22 :date "2026-09-11" :benchmark :ldbc-snb-interactive-network-v2
+  :rung :sf1-subset-35k-posts :origin :cross-host :path :lan :mix [:ic02 :ic07 :ic08 :ic09 :is2 :is4 :is5 :is7] :inflight 8 :sut-threads 8 :impl :datalog
+  :rate 3072 :throughput-ops-s 2940.7 :on-time-pct 100.0 :failed 0 :empty-share 0.33
+  :next-rate-failed {:rate 4096 :on-time-pct 13.90}
+  :p50-ms {:ic02 3.3 :ic07 2.0 :ic08 1.6 :ic09 5.6 :is2 2.8 :is4 1.6 :is5 1.6 :is7 1.7}
+  :answers-agree {:checked 787 :disagreements 0 :reference "index twins; Neo4j pairing covers IC only"}
+  :target-ops-s 139411.14 :ratio-to-target 47 :verdict :growth
+  :receipt "kotobase-peer bench/results/2026-09-11-ldbc-snb-network-iteration-22-short-reads.edn"
+  :note "mix widened 4 -> 8 of 29 operations at higher throughput on the same slots (2047 -> 2941): growth by the widening rule. IS1/IS3/IS6 need attributes the subset does not load"}
+ {:iteration 22 :date "2026-09-11" :benchmark :ldbc-snb-interactive-network-v2
+  :rung :sf1-subset-35k-posts :origin :cross-host :path :lan :mix [:ic02 :ic07 :ic08 :ic09 :is2 :is4 :is5 :is7] :inflight 32 :sut-threads 8 :impl :datalog
+  :rate 5120 :throughput-ops-s 5118.4 :on-time-pct 100.0 :failed 0 :empty-share 0.33
+  :next-rate-failed {:rate 6144 :on-time-pct 56.57 :throughput-at-failure 5631.2}
+  :p50-ms {:ic02 4.4 :ic07 2.8 :ic08 2.3 :ic09 8.0 :is2 4.1 :is4 2.3 :is5 2.3 :is7 2.3}
+  :target-ops-s 139411.14 :ratio-to-target 27 :verdict :growth
+  :note "32-slot column 3453 -> 5118 with the wider mix; SUT ceiling on this mix ~5,600 delivered"}]
