@@ -52,4 +52,26 @@
   :host-memory {:sut {:swap-used-pct 0.0 :rss-mb 4609 :heap-used-mb 3133} :driver {:swap-used-pct 91.7}}
   :load-avg {:sut ["4.23" "2.68" "2.23"] :driver ["9.51" "10.42" "15.42"]} :verdict :baseline
   :receipt "kotobase-peer bench/results/2026-09-11-ldbc-snb-network-cross-host-simeon-sf1-subset.edn"
-  :note "first valid row (resident SUT). Ceiling is 8 slots over ~112 ms mean latency; 32 slots move the queue into the SUT without moving the ceiling (69.6 at rate 96), SUT JVM at 284% CPU with 8 threads -- not CPU-bound at saturation. 8.1x iteration 13, which measured paging at a different origin"}]
+  :note "first valid row (resident SUT). Ceiling is 8 slots over ~112 ms mean latency; 32 slots move the queue into the SUT without moving the ceiling (69.6 at rate 96), SUT JVM at 284% CPU with 8 threads -- not CPU-bound at saturation. 8.1x iteration 13, which measured paging at a different origin"}
+ {:iteration 16 :date "2026-09-11" :benchmark :ldbc-snb-interactive-network-v2
+  :rung :sf1-subset-35k-posts :origin :cross-host :mix [:ic02 :ic07 :ic08 :ic09] :inflight 8 :sut-threads 8 :impl :datalog
+  :rate 64 :throughput-ops-s 62.4 :on-time-pct 100.0 :failed 0 :empty-share 0.44
+  :p50-ms {:ic02 17.2 :ic07 15.1 :ic08 128.1 :ic09 292.7} :verdict :reference
+  :note "Datalog path re-measured on the restarted SUT; matches iteration 15"}
+ {:iteration 16 :date "2026-09-11" :benchmark :ldbc-snb-interactive-network-v2
+  :rung :sf1-subset-35k-posts :origin :cross-host :mix [:ic02 :ic07 :ic08 :ic09] :inflight 8 :sut-threads 8 :impl :index
+  :rate 256 :throughput-ops-s 255.6 :on-time-pct 100.0 :failed 0 :empty-share 0.43 :rows-mean 8.3
+  :next-rate-failed {:rate 384 :on-time-pct 51.81}
+  :p50-ms {:ic02 10.3 :ic07 9.9 :ic08 9.7 :ic09 41.2}
+  :answers-agree {:checked 392 :disagreements 0}
+  :target-ops-s 139411.14 :ratio-to-target 545
+  :host-memory {:sut {:swap-used-pct 0.0}} :load-avg {:sut ["6.95" "4.52" "3.50"]} :verdict :growth
+  :receipt "kotobase-peer bench/results/2026-09-11-ldbc-snb-network-iteration-16-index-path.edn"
+  :note "4.1x over the Datalog reference with rung/origin/mix/inflight held; the four reads bound directly to the L1 index paths (ADR-2608039970), same answers on all 392 official parameters. IC02/07/08 p50 is now the Tailscale rtt"}
+ {:iteration 16 :date "2026-09-11" :benchmark :ldbc-snb-interactive-network-v2
+  :rung :sf1-subset-35k-posts :origin :cross-host :mix [:ic02 :ic07 :ic08 :ic09] :inflight 32 :sut-threads 8 :impl :index
+  :rate 512 :throughput-ops-s 511.1 :on-time-pct 100.0 :failed 0 :empty-share 0.43
+  :next-rate-failed {:rate 768 :on-time-pct 21.71 :throughput-at-failure 618.2}
+  :p50-ms {:ic02 12.1 :ic07 11.3 :ic08 10.9 :ic09 55.9}
+  :target-ops-s 139411.14 :ratio-to-target 273 :verdict :growth
+  :note "same arm with 32 driver slots (the rtt was the 8-slot ceiling); 8.2x the Datalog reference. Inflight is a driver setting the sponsor picks (Huawei ran 64 read threads); recorded as its own column"}]
