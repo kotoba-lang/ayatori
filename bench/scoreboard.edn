@@ -207,4 +207,8 @@
   :footprint-bytes-per-quad-by-group {:names 483 :profile 473 :knows-plain 230 :knows-reified 491 :message-date 638 :message-content 478 :has-creator 453 :reply-of 472 :likes-reified 556}
   :method "35k subset on simeon, ParallelGC, gc x3 between groups, live heap diff per group (bench/coscientist-iteration-27.edn)"
   :full-sf1-extrapolation {:quads 20569957 :gb 10.3 :observed-used-heap-gb 10.9 :reified-edge-share 0.40}
-  :note "no throughput row: S17, where the ~530 B per quad go. Every group costs 450-640 B except plain knows (230, subjects shared); content strings are ~70 B of their 478. The cost is the three persistent index maps per quad, not the values. Reified edge properties (likes, knows dates) are 40% of full SF1's heap"}]
+  :note "no throughput row: S17, where the ~530 B per quad go. Every group costs 450-640 B except plain knows (230, subjects shared); content strings are ~70 B of their 478. The cost is the three persistent index maps per quad, not the values. Reified edge properties (likes, knows dates) are 40% of full SF1's heap"}
+ {:iteration 28 :date "2026-09-11" :benchmark :ldbc-snb-interactive-network-v2
+  :throughput-ops-s nil :verdict :measured-no-row
+  :interning-experiment {:as-is-mb 588 :interned-mb 634 :distinct-strings 828349 :quads 1788143}
+  :note "S19 first probe: canonicalising every :s/:o string through one table saves nothing (the table costs 46 MB more than the duplicates it removes). Strings are not the lever; the per-quad node paths in the three persistent index maps are. Next is a representation experiment inside datalog.index, which is an engine decision"}]
