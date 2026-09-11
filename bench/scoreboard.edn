@@ -269,4 +269,22 @@
   :read-after-write {:checked 184 :not-visible 0 :outside-window 10 :unverifiable 56}
   :target-ops-s 139411.14 :ratio-to-target 41 :verdict :growth-by-shape
   :receipt "kotobase-peer bench/results/2026-09-11-ldbc-snb-network-iteration-32-interleave.edn"
-  :note "32-slot column 3827 (fixed-share, it.31) -> 3372 under the interleave: the dependency rule costs read headroom; control at TCR 0.0001 = 87.46% on-time (fails the rule, not a row)"}]
+  :note "32-slot column 3827 (fixed-share, it.31) -> 3372 under the interleave: the dependency rule costs read headroom; control at TCR 0.0001 = 87.46% on-time (fails the rule, not a row)"}
+ {:iteration 33 :date "2026-09-11" :benchmark :ldbc-snb-interactive-network-v2
+  :rung :sf1-subset-35k-posts+profiles+knows-dates+forums :origin :cross-host :path :lan :sut "levi" :driver "judah"
+  :mix [:ic02 :ic07 :ic08 :ic09 :is1 :is2 :is3 :is4 :is5 :is6 :is7 :stream] :stream {:tcr 0.0002 :types [:ins1 :ins2 :ins3 :ins4 :ins5 :ins6 :ins7 :ins8] :skipped-types []}
+  :inflight 8 :sut-threads 8 :impl :datalog
+  :rate 1280 :updates-per-s 1092 :throughput-ops-s 2332.6 :on-time-pct 100.0 :failed 0
+  :read-after-write {:checked 276 :not-visible 0 :outside-window 15 :unverifiable 75 :is6-checked 57 :no-covering-read 60}
+  :target-ops-s 139411.14 :ratio-to-target 60 :verdict :growth
+  :receipt "kotobase-peer bench/results/2026-09-11-ldbc-snb-network-iteration-33-all-inserts.edn"
+  :note "all 8 insert types served, 0 skipped; reads 1536 fails (58.5% on-time) so this is a ceiling; INS4 verified through IS6 on a post landing in the new forum, INS5 counted as no-covering-read"}
+ {:iteration 33 :date "2026-09-11" :benchmark :ldbc-snb-interactive-network-v2
+  :rung :sf1-subset-35k-posts+profiles+knows-dates+forums :origin :cross-host :path :lan :sut "levi" :driver "judah"
+  :mix [:ic02 :ic07 :ic08 :ic09 :is1 :is2 :is3 :is4 :is5 :is6 :is7 :stream] :stream {:tcr 0.00015 :types [:ins1 :ins2 :ins3 :ins4 :ins5 :ins6 :ins7 :ins8] :skipped-types []}
+  :inflight 32 :sut-threads 8 :impl :datalog
+  :rate 3072 :updates-per-s 1475 :throughput-ops-s 4545.5 :on-time-pct 100.0 :failed 0
+  :read-after-write {:checked 276 :not-visible 0 :outside-window 0 :unverifiable 84 :is6-checked 57 :no-covering-read 60}
+  :target-ops-s 139411.14 :ratio-to-target 31 :verdict :growth
+  :receipt "kotobase-peer bench/results/2026-09-11-ldbc-snb-network-iteration-33-all-inserts.edn"
+  :note "reads 3584 fails (42.1% on-time) so this is a ceiling. CORRECTION to iteration 32's 32-slot row: its sweep (2048,2560) ended on a passing rate, so 3371.6 was the last rate tried, not the highest passing rate; the ceiling under the it.32 stream was never measured"}]
