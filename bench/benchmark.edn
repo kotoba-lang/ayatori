@@ -1,0 +1,53 @@
+;; bench/benchmark.edn — the fixed judge for the query plane's co-scientist
+;; loop. Owner instruction 2026-09-11: "benchmark も決めて".
+;;
+;; This file is the contract every iteration is scored against. Changing it
+;; is a decision, not a tidy-up: an iteration that moves the judge and the
+;; number in the same commit has measured nothing. `bench/fitness` implements
+;; it; `bench/scoreboard.edn` (append-only) holds one line per iteration at
+;; the fixed shape, so growth is a column and not a sentence.
+{:benchmark/id :ayatori-query-plane-v1
+ :benchmark/since "2026-09-11 (iteration 11 is the first row scored under it)"
+
+ ;; ── what is measured ──────────────────────────────────────────────────────
+ ;; The corpus holds the ANSWER fixed (3 rows) while the database grows, so a
+ ;; sweep is a statement about the database and not the result. The fixed
+ ;; shape every scoreboard row reports is the largest one.
+ :corpus {:generator "bench/fitness corpus: n subjects, exactly 3 kind=rare"
+          :sizes [50 100 200 400 800]
+          :fixed-shape 800
+          :query [:find [?s ?name] :where [[?s "kind" "rare"] [?s "name" ?name]]]
+          :answer-rows 3}
+
+ ;; ── the units ──────────────────────────────────────────────────────────────
+ ;; Counts, never wall clock (ADR-2608160100; this workstation runs many
+ ;; agents at once, and a millisecond describes the machine).
+ :metrics {:reads "range/object requests that would cross a network"
+           :bytes "bytes those requests moved"
+           :packs-opened "packs whose header/index were read (multi-pack arms)"
+           :packs-total "packs that exist for the snapshot (multi-pack arms)"}
+
+ ;; ── the arms ───────────────────────────────────────────────────────────────
+ ;; Every arm answers the same query over the same snapshot. The reference
+ ;; arms never change; new arms are added beside them, not instead of them.
+ :arms {:reference [:per-object :exact-read]
+        :under-test [:window/bfs :multi/bfs :multi/hash]}
+
+ ;; ── the gate ───────────────────────────────────────────────────────────────
+ ;; A faster arm that returns fewer rows has not run. The harness exits 2.
+ :gate :every-arm-returns-the-same-3-rows
+
+ ;; ── what counts as growth ─────────────────────────────────────────────────
+ ;; Growth is a strict improvement on one axis with the other held, or an
+ ;; improvement on both. A trade (reads down, bytes up) is recorded as a
+ ;; trade and is growth only if the iteration says which store price makes
+ ;; it one. Round trips are the primary axis (ADR-2608160100); bytes the
+ ;; secondary, because iteration 01 measured transfer as what scales.
+ :growth {:primary :reads
+          :secondary :bytes
+          :rule "reads at :fixed-shape strictly lower with bytes <= previous, or both lower; else :trade, with the price stated"}
+
+ ;; ── what is NOT in this benchmark, on purpose ─────────────────────────────
+ :excluded {:wall-clock "describes the machine, not the transport"
+            :live-origin "the Worker measurements (root ADR-2609109900) are a different judge with a different unit (R2 requests, io-ms); they inform hypotheses here and are not scored here"
+            :cpu "iteration 10 attributes the fold's CPU separately; it is not this benchmark's axis"}}
