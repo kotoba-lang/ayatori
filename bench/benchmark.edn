@@ -137,7 +137,11 @@
  ;; passing TCR, which is how the audited table defines it. Rows carry
  ;; `:schedule :official`; the uniform round-robin rows stay as their own
  ;; column (`:schedule :uniform`, the default before this date).
- :schedule {:official {:properties "kotobase-peer bench/ldbc-sf1-official.properties" :metric :throughput-at-lowest-passing-tcr}
+ ;; Amended 2026-09-12 after iteration 48: the short-read generator is LDBC's
+ ;; own (LdbcSnbShortReadGenerator, ported rule for rule); official rows
+ ;; carry `:generator :exact`, and the two rows measured under the earlier
+ ;; approximation are marked `:generator :approximate-superseded-by-iteration-48`.
+ :schedule {:official {:properties "kotobase-peer bench/ldbc-sf1-official.properties" :metric :throughput-at-lowest-passing-tcr :generator :exact}
             :uniform {:metric :throughput-at-highest-passing-rate}}
  :growth {:primary :throughput-ops-s
           :held [:rung :origin :mix]
