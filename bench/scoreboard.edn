@@ -114,4 +114,18 @@
   :next-rate-failed {:rate 2048 :on-time-pct 37.58 :throughput-at-failure 1797.4}
   :p50-ms {:ic02 15.2 :ic07 15.2 :ic08 15.6 :ic09 18.4}
   :target-ops-s 139411.14 :ratio-to-target 91 :verdict :baseline
-  :note "first 64-slot row (Huawei ran 64 read threads). Driver host load 27-45 during these runs; SUT resident"}]
+  :note "first 64-slot row (Huawei ran 64 read threads). Driver host load 27-45 during these runs; SUT resident"}
+ {:iteration 20 :date "2026-09-11" :benchmark :ldbc-snb-interactive-network-v2
+  :rung :sf1-subset-35k-posts :origin :cross-host :mix [:ic02 :ic07 :ic08 :ic09] :inflight 8 :sut-threads 8 :impl :datalog
+  :rate 256 :throughput-ops-s 255.9 :on-time-pct 100.0 :failed 0 :empty-share 0.43
+  :p50-ms {:ic02 12.2 :ic07 10.4 :ic08 9.9 :ic09 15.4} :verdict :no-growth
+  :note "8-slot column unchanged at the wire ceiling (255.9); nothing on the SUT can move it"}
+ {:iteration 20 :date "2026-09-11" :benchmark :ldbc-snb-interactive-network-v2
+  :rung :sf1-subset-35k-posts :origin :cross-host :mix [:ic02 :ic07 :ic08 :ic09] :inflight 64 :sut-threads 8 :impl :datalog
+  :rate 2048 :throughput-ops-s 2027.0 :on-time-pct 98.65 :failed 0 :empty-share 0.43
+  :next-rate-failed {:rate 3072 :on-time-pct 89.40 :throughput-at-failure 2903.8}
+  :p50-ms {:ic02 16.4 :ic07 15.6 :ic08 15.2 :ic09 19.9}
+  :answers-agree {:checked 392 :disagreements 0}
+  :target-ops-s 139411.14 :ratio-to-target 69 :verdict :growth
+  :receipt "kotobase-peer bench/results/2026-09-11-ldbc-snb-network-iteration-20-plan-cache.edn"
+  :note "64-slot column 1533 -> 2027 (1.32x): the planner's whole-relation estimate (9.2 ms of a 9.0 ms IC08) cached per index version; IC08 in-process 9.0 -> 0.17 ms. 128 slots hit connection failures and were refused; 3072 delivered 2904 ops/s at 89% on-time -- the driver's slots are now the queue"}]
