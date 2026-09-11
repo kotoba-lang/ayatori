@@ -1,10 +1,20 @@
-;; bench/scoreboard.edn — APPEND-ONLY. One line per co-scientist iteration at
-;; the benchmark's fixed shape (bench/benchmark.edn, 800 subjects, 3 rows).
-;; A row is written by the iteration that produced it and never edited; a
-;; wrong row gets a correcting row, not a rewrite. Reference arms are
-;; repeated on every row so a drift in the judge itself is visible.
+;; bench/scoreboard.edn — APPEND-ONLY. One row per co-scientist iteration
+;; under the judge named by its :benchmark key (bench/benchmark.edn). A row
+;; is written by the iteration that produced it and never edited; a wrong
+;; row gets a correcting row, not a rewrite.
 ;;
-;;   iteration  arm            reads  bytes    packs-opened/total  verdict
+;; Rows for iterations 11-12 were scored under :ayatori-query-plane-v1
+;; (reads / bytes at 800 subjects, 3 rows; reference arms repeated so a
+;; drift in the judge is visible). From iteration 13 the judge is
+;; :ldbc-snb-interactive-network-v2: LDBC SNB Interactive throughput
+;; (ops/s) at the highest scheduled rate with >= 95% on-time starts and 0
+;; failed operations, measured over the network; every row names its rung
+;; (SF), origin, operation mix, empty-answer share and the load average.
+;; The target column is the audited world No.1 (Huawei GES, 2025-12-01,
+;; 139,411 ops/s at SF300); the ratio is raw, never hardware-rescaled.
+;;
+;;   v1: iteration  arm  reads  bytes  packs-opened/total  verdict
+;;   v2: iteration  rung  origin  mix  rate  throughput  on-time%  empty-share  load  verdict
 [{:iteration 11 :date "2026-09-11" :arm :per-object   :reads 12 :bytes 109764 :verdict :reference}
  {:iteration 11 :date "2026-09-11" :arm :exact-read   :reads 8  :bytes 110996 :verdict :reference}
  {:iteration 11 :date "2026-09-11" :arm :window/hash  :reads 7  :bytes 394166 :window 65536 :verdict :trade
@@ -16,4 +26,13 @@
  {:iteration 12 :date "2026-09-11" :arm :multi/hash   :reads 6  :bytes 237234 :packs-opened 2 :packs-total 2 :window 65536 :verdict :no-growth
   :note "K=2; best multi-pack arm, behind iteration 11 window/bfs (4 / 197558) on both axes"}
  {:iteration 12 :date "2026-09-11" :arm :multi/bfs    :reads 8  :bytes 265302 :packs-opened 4 :packs-total 8 :window 65536 :verdict :no-growth
-  :note "K=8; fewest packs opened of any multi arm and the most reads -- equal-count chunks of BFS order cut at level boundaries, not sibling boundaries, and a chunk of large leaves exceeds the window (head + index + window per open)"}]
+  :note "K=8; fewest packs opened of any multi arm and the most reads -- equal-count chunks of BFS order cut at level boundaries, not sibling boundaries, and a chunk of large leaves exceeds the window (head + index + window per open)"}
+ {:iteration 13 :date "2026-09-11" :benchmark :ldbc-snb-interactive-network-v2
+  :rung :sf1-subset-35k-posts :origin :loopback :mix [:ic02 :ic07 :ic08 :ic09] :inflight 8 :sut-threads 8
+  :rate 8 :throughput-ops-s 7.76 :on-time-pct 100.0 :failed 0 :empty-share 0.52 :rows-mean 7.0
+  :next-rate-failed {:rate 16 :on-time-pct 22.81 :start-delay-p95-ms 5632}
+  :p50-ms {:ic02 32.6 :ic07 24.8 :ic08 236.4 :ic09 1001.5}
+  :target-ops-s 139411.14 :ratio-to-target 1.8e4
+  :load-avg ["12.60" "19.18" "21.08"] :verdict :baseline
+  :receipt "kotobase-peer bench/results/2026-09-11-ldbc-snb-network-loopback-sf1-subset.edn"
+  :note "first row under v2; half the completed operations are empty answers because the subset keeps the most recent posts while official parameters span 2011-2012 -- a subset rung, not a score"}]
