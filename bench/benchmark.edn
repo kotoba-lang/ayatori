@@ -105,6 +105,11 @@
  ;; 34.5 of 35.8 GB). Load average did not show it; swap did. A run on a
  ;; host past the swap threshold is refused by the driver (exit 2), and
  ;; host memory is written beside every row with the load average.
+ ;; Amended 2026-09-12 after iteration 40: on an Apple-silicon SUT a lightly
+ ;; loaded process runs on the efficiency cores, so server-ms p50 at a low
+ ;; rate is ~2.5x the same op's cost at saturation (IC09 12.0 vs 4.8 ms on
+ ;; the same parameters). Per-op costs are compared at saturation only;
+ ;; ceilings are unaffected.
  :gate {:validity [:zero-failed-operations :on-time>=95% :answers-agree-with-reference :sut-resident]
         ;; Amended 2026-09-11 after iteration 26: a full-SF1 SUT with 6.6 GB
         ;; of its heap in swap passed the swap threshold (80.7%) and the old
