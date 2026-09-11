@@ -161,4 +161,11 @@
   :next-rate-failed {:rate 6144 :on-time-pct 56.57 :throughput-at-failure 5631.2}
   :p50-ms {:ic02 4.4 :ic07 2.8 :ic08 2.3 :ic09 8.0 :is2 4.1 :is4 2.3 :is5 2.3 :is7 2.3}
   :target-ops-s 139411.14 :ratio-to-target 27 :verdict :growth
-  :note "32-slot column 3453 -> 5118 with the wider mix; SUT ceiling on this mix ~5,600 delivered"}]
+  :note "32-slot column 3453 -> 5118 with the wider mix; SUT ceiling on this mix ~5,600 delivered"}
+ {:iteration 23 :date "2026-09-11" :benchmark :ldbc-snb-interactive-network-v2
+  :rung :sf1-subset-35k-posts :mix [:ic02 :ic07 :ic08 :ic09 :is2 :is4 :is5 :is7]
+  :throughput-ops-s nil :verdict :reference-established
+  :answers-agree {:reference "Neo4j embedded, paired in one JVM on simeon" :per-op {:ic02 98 :ic07 98 :ic08 98 :ic09 98 :is2 98 :is4 99 :is5 99 :is7 99} :disagreements 0}
+  :paired-p50-ratio-kotobase-over-neo4j {:ic02 0.28 :ic07 1.31 :ic08 2.32 :ic09 0.85}
+  :receipt "kotobase-peer bench/results/2026-09-11-ldbc-paired-neo4j-all-parameters-with-short-reads.edn"
+  :note "no new throughput row; this row closes the reference gap the iteration 22 rows stated: every served read now agrees with Neo4j on every official parameter and the subset's short-read messages. Paired in-process, kotobase is ahead of embedded Neo4j on IC02 (3.6x) and IC09 (1.2x) -- 2026-08-14 had 3.07 and 7.38 the other way"}]
