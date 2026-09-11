@@ -240,6 +240,73 @@
     (if (and n (pos? n)) n 65536)))
 (def ^:private window-rows (atom []))
 
+;; ── Co-scientist iteration 12: many packs, and which of them a query opens ──
+;;
+;; H2 in root ADR-2609119000: packs aligned to the index's unit -- one prolly
+;; internal node's siblings per pack -- make a range query touch few packs.
+;; The measurable form here: the SAME blocks split into K contiguous chunks
+;; of an ordering, each chunk one CARv2 pack, a catalog mapping every CID to
+;; its pack, and packs opened lazily by the first read that needs them. The
+;; variable is the ordering the chunks were cut from: breadth-first (siblings
+;; adjacent -- the approximation of a per-node pack) or hash order. The judge
+;; gains one column: packs opened over packs that exist.
+;;
+;; Predicted before running: bfs opens a small, K-insensitive number of packs
+;; (the traversal's blocks sit in adjacent chunks); hash opens min(K, blocks
+;; needed). Reads per opened pack are 1 (head window holds the chunk) so
+;; reads track packs-opened for bfs and blocks-needed for hash.
+
+(defn- chunk-packs
+  "K packs from `entries` in the order given, each chunk root-first within
+   itself as delivered. Returns [{:archive bytes :cids #{..}} ...]."
+  [snapshot-cid entries k]
+  (let [n (count entries)
+        size (max 1 (js/Math.ceil (/ n k)))]
+    (mapv (fn [chunk]
+            {:archive (:bytes (car2/pack {:roots [snapshot-cid] :blocks (vec chunk)}))
+             :cids (set (map :cid chunk))})
+          (partition-all size entries))))
+
+(defn- packed-multi-arm
+  [{:keys [snapshot-cid] :as snap} label order-fn k window]
+  (let [packs (chunk-packs snapshot-cid (order-fn snap) k)
+        catalog (into {} (for [[i p] (map-indexed vector packs) cid (:cids p)] [cid i]))
+        range-reads (atom 0) bytes (atom 0) opened (atom {})
+        range-fn-for (fn [archive]
+                       (fn [{:keys [range]}]
+                         (swap! range-reads inc)
+                         (let [[_ from to] (re-matches #"bytes=(\d+)-(\d*)" range)
+                               start (js/parseInt from 10)
+                               total (b/bcount archive)
+                               end (if (seq to) (min total (inc (js/parseInt to 10))) total)
+                               slice (b/slice archive start (min end total))]
+                           (swap! bytes + (b/bcount slice))
+                           slice)))
+        open! (fn [i]
+                (or (get @opened i)
+                    (let [p (pack/open-pack {:range-fn (range-fn-for (:archive (nth packs i)))
+                                             :window window
+                                             :profile {:blocks :packed-blocks :object #{:range-read}}})]
+                      (swap! opened assoc i p)
+                      p)))
+        block-source (fn [cid]
+                       (when-let [i (get catalog cid)]
+                         (pack/read-block (open! i) cid)))
+        snapshot (remote/open-snapshot
+                  {:snapshot-cid snapshot-cid
+                   :discover-fn (fn [cid] {:ok? true :cid cid :mutates-cid? false
+                                           :providers [{:plane :discovery :cid cid :peer "p"
+                                                        :addrs [] :mutates-cid? false}]})
+                   :fetch-fn (fn [_ _] nil)
+                   :block-source block-source
+                   :blind-fn blind :decrypt-fn crypto})
+        rows (remote/q snapshot query (constantly true))]
+    {:arm label :rows (count rows) :round-trips @range-reads
+     :reads @range-reads :bytes @bytes
+     :packs-opened (count @opened) :packs-total (count packs)}))
+
+(def ^:private multi-rows (atom []))
+
 (defn -main []
   (println)
   (println "ayatori fitness — counted, not timed (ADR-2608160100)")
@@ -275,6 +342,14 @@
                                              (:rows d1) (:rows d2))
                                     (js/process.exit 2))
                                   (swap! window-rows conj [n b d1 d2]))
+                                (doseq [k [2 4 8]]
+                                  (let [m1 (packed-multi-arm snap "multi/hash" hash-order k window-bytes)
+                                        m2 (packed-multi-arm snap "multi/bfs" bfs-order k window-bytes)]
+                                    (when-not (= 3 (:rows m1) (:rows m2))
+                                      (println "REFUSING: a multi-pack arm did not return the same 3 rows:"
+                                               (:rows m1) (:rows m2))
+                                      (js/process.exit 2))
+                                    (swap! multi-rows conj [n k m1 m2])))
                                 (conj acc [n a b c])))))))))
        (js/Promise.resolve [])
        [50 100 200 400 800])
@@ -284,6 +359,12 @@
                (println (fmt 7 "subj" 14 "|  exact-read" 10 "bytes" 16 "|  window/hash" 10 "bytes" 15 "|  window/bfs" 10 "bytes"))
                (doseq [[n b d1 d2] @window-rows]
                  (println (fmt 7 n 14 (:reads b) 10 (:bytes b) 16 (:reads d1) 10 (:bytes d1) 15 (:reads d2) 10 (:bytes d2))))
+               (println)
+               (println (str "iteration 12 -- K packs cut from an ordering; packs opened / total, reads, bytes"))
+               (println (fmt 7 "subj" 4 "K" 20 "|  multi/hash  opened" 7 "reads" 9 "bytes" 20 "|  multi/bfs   opened" 7 "reads" 9 "bytes"))
+               (doseq [[n k m1 m2] @multi-rows]
+                 (println (fmt 7 n 4 k 20 (str (:packs-opened m1) "/" (:packs-total m1)) 7 (:reads m1) 9 (:bytes m1)
+                               20 (str (:packs-opened m2) "/" (:packs-total m2)) 7 (:reads m2) 9 (:bytes m2))))
                (println)
                (let [[n0 a0 _] (first rs) [n1 a1 b1 c1] (last rs)]
                  (println (str "scaling: database grew " (/ (* 2 n1) (* 2 n0)) "x, "

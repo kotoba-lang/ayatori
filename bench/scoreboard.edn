@@ -1,0 +1,19 @@
+;; bench/scoreboard.edn — APPEND-ONLY. One line per co-scientist iteration at
+;; the benchmark's fixed shape (bench/benchmark.edn, 800 subjects, 3 rows).
+;; A row is written by the iteration that produced it and never edited; a
+;; wrong row gets a correcting row, not a rewrite. Reference arms are
+;; repeated on every row so a drift in the judge itself is visible.
+;;
+;;   iteration  arm            reads  bytes    packs-opened/total  verdict
+[{:iteration 11 :date "2026-09-11" :arm :per-object   :reads 12 :bytes 109764 :verdict :reference}
+ {:iteration 11 :date "2026-09-11" :arm :exact-read   :reads 8  :bytes 110996 :verdict :reference}
+ {:iteration 11 :date "2026-09-11" :arm :window/hash  :reads 7  :bytes 394166 :window 65536 :verdict :trade
+  :note "reads -1 for bytes x3.55 -- a loss at any store that charges for bytes"}
+ {:iteration 11 :date "2026-09-11" :arm :window/bfs   :reads 4  :bytes 197558 :window 65536 :verdict :trade
+  :note "reads -4 (3.0x vs per-object) for bytes x1.78; growth if a round trip costs more than ~22 KB of transfer, which is the store's number to supply"}
+ {:iteration 12 :date "2026-09-11" :arm :per-object   :reads 12 :bytes 109764 :verdict :reference}
+ {:iteration 12 :date "2026-09-11" :arm :exact-read   :reads 8  :bytes 110996 :verdict :reference}
+ {:iteration 12 :date "2026-09-11" :arm :multi/hash   :reads 6  :bytes 237234 :packs-opened 2 :packs-total 2 :window 65536 :verdict :no-growth
+  :note "K=2; best multi-pack arm, behind iteration 11 window/bfs (4 / 197558) on both axes"}
+ {:iteration 12 :date "2026-09-11" :arm :multi/bfs    :reads 8  :bytes 265302 :packs-opened 4 :packs-total 8 :window 65536 :verdict :no-growth
+  :note "K=8; fewest packs opened of any multi arm and the most reads -- equal-count chunks of BFS order cut at level boundaries, not sibling boundaries, and a chunk of large leaves exceeds the window (head + index + window per open)"}]
