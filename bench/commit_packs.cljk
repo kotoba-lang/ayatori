@@ -1,5 +1,5 @@
 #!/usr/bin/env nbb
-;; bench/commit_packs.cljs — Co-Scientist iteration 03: the write policy itself.
+;; bench/commit_packs.cljk — Co-Scientist iteration 03: the write policy itself.
 ;;
 ;; Iteration 02 measured the many-pack regime by SPLITTING one snapshot into P
 ;; packs. That answers "what does a query pay when blocks are spread over P
@@ -27,7 +27,7 @@
 ;; head and the harness exits 2 if they disagree.
 ;;
 ;; Run:
-;;   nbb --classpath "$(cat bin/classpath.txt)" bench/commit_packs.cljs
+;;   nbb --classpath "$(cat bin/classpath.txt)" bench/commit_packs.cljk
 
 (ns commit-packs
   (:require [arrangement.core :as arr]

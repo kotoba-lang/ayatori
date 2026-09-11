@@ -1,5 +1,5 @@
 #!/usr/bin/env nbb
-;; bench/hyakka_pack.cljs — Co-Scientist iteration 02, second arm: the same
+;; bench/hyakka_pack.cljk — Co-Scientist iteration 02, second arm: the same
 ;; question against a REAL corpus instead of a synthetic one.
 ;;
 ;; `many_packs.cljs` measures the crossover on a synthetic snapshot whose blocks
@@ -16,7 +16,7 @@
 ;; be this file's author choosing the block sizes that decide the answer.
 ;;
 ;; Run:
-;;   nbb --classpath "$(cat bin/classpath.txt)" bench/hyakka_pack.cljs
+;;   nbb --classpath "$(cat bin/classpath.txt)" bench/hyakka_pack.cljk
 
 (ns hyakka-pack
   (:require ["node:fs" :as fs]

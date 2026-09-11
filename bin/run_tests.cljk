@@ -2,7 +2,7 @@
 ;; clojurewasm > cljs > nbb > (jvm/bb)). Run from the repo root:
 ;;
 ;;   npm install
-;;   nbb --classpath "$(cat bin/classpath.txt)" bin/run_tests.cljs
+;;   nbb --classpath "$(cat bin/classpath.txt)" bin/run_tests.cljk
 ;;
 ;; where every `.deps/<name>` is a checkout of the matching kotoba-lang repo
 ;; at the SHA pinned for it. The direct ones are in this repo's deps.edn;

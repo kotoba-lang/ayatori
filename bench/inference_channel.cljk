@@ -1,5 +1,5 @@
 #!/usr/bin/env nbb
-;; bench/inference_channel.cljs — what a caller learns about data it cannot
+;; bench/inference_channel.cljk — what a caller learns about data it cannot
 ;; read one value of.
 ;;
 ;; ADR-2609108000 (com-junkawasaki/root) says: measure the channel before
@@ -23,7 +23,7 @@
 ;; broken build).
 ;;
 ;; Run:
-;;   nbb --classpath "$(cat /path/to/cp.txt)" bench/inference_channel.cljs
+;;   nbb --classpath "$(cat /path/to/cp.txt)" bench/inference_channel.cljk
 
 (ns inference-channel
   (:require [kotobase.local :as local]

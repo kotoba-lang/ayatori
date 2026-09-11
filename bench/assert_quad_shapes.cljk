@@ -1,5 +1,5 @@
 #!/usr/bin/env nbb
-;; bench/assert_quad_shapes.cljs — Co-Scientist iteration 10.
+;; bench/assert_quad_shapes.cljk — Co-Scientist iteration 10.
 ;;
 ;; A fold on yoro-social-v2 spends ~27 CPU-seconds between its last store call
 ;; and being killed, never reaching qs/commit! (root ADR-2609100100: the phase
@@ -13,7 +13,7 @@
 ;; a sweep that only varies COUNT can miss it.
 ;;
 ;; Run:
-;;   nbb --classpath "src:$(clojure -Spath)" bench/assert_quad_shapes.cljs
+;;   nbb --classpath "src:$(clojure -Spath)" bench/assert_quad_shapes.cljk
 
 (ns aq2 (:require [arrangement.core :as arr] [ipld.core :as ipld]))
 ;; The previous sweep used trivial string values and found assert-quad flat at

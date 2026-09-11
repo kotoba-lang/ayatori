@@ -1,5 +1,5 @@
 #!/usr/bin/env nbb
-;; bench/regimes.cljs — Co-Scientist iteration 04. All three seeds iteration 03
+;; bench/regimes.cljk — Co-Scientist iteration 04. All three seeds iteration 03
 ;; left, in one harness because they share it.
 ;;
 ;;   A  Where does `packs opened` stop saturating at 3? (iteration 03 saw 3 for
@@ -14,7 +14,7 @@
 ;; Round trips, never wall clock. Every section states its own gate.
 ;;
 ;; Run:
-;;   nbb --classpath "$(cat bin/classpath.txt)" bench/regimes.cljs
+;;   nbb --classpath "$(cat bin/classpath.txt)" bench/regimes.cljk
 
 (ns regimes
   (:require [arrangement.core :as arr]

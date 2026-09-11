@@ -6,20 +6,20 @@
   Measured 2026-09-04, this repo had FOUR nbb entry points and each reported
   a different green, all `0 failures`:
 
-      bin/run_tests.cljs    53 tests / 106 assertions   (GitHub CI)
-      run-tests.cljs        66 / 137                    (fleet gate, self-described
+      bin/run_tests.cljk    53 tests / 106 assertions   (GitHub CI)
+      run-tests.cljk        66 / 137                    (fleet gate, self-described
                                                          as \"the whole suite\")
-      run-tests-pure.cljs   18 /  47                    (dependency-free half)
+      run-tests-pure.cljk   18 /  47                    (dependency-free half)
       all five namespaces   77 / 165                    (nothing ran this)
 
   None of them ran the whole suite, and the two fleet gates disagreed with
   each other: `:jvm-test` discovers namespaces through cognitect's runner
-  and saw all five, while `nbb-cross-runtime-query` ran `run-tests.cljs` and
+  and saw all five, while `nbb-cross-runtime-query` ran `run-tests.cljk` and
   saw four -- missing `ayatori.remote-test`, the ONE namespace that
   exercises discovery -> fetch -> CID verification, which is the thing this
   repo is for.
 
-  `run-tests.cljs` had already diagnosed the failure mode in a comment --
+  `run-tests.cljk` had already diagnosed the failure mode in a comment --
   \"a runner that repeats the list can fall behind the suite and report a
   subset as a pass\" -- and replaced its list with a `t/run-all-tests`
   namespace PATTERN. That does not fix it, for a reason the comment does

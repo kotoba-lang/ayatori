@@ -1,9 +1,9 @@
 #!/usr/bin/env nbb
-;; bench/many_packs.cljs — Co-Scientist iteration 02, the regime iteration 01
+;; bench/many_packs.cljk — Co-Scientist iteration 02, the regime iteration 01
 ;; named as unmeasured: "the interesting regime is where a query touches many
 ;; packs".
 ;;
-;; `bench/fitness.cljs` puts EVERY block of a snapshot into one pack. That is
+;; `bench/fitness.cljk` puts EVERY block of a snapshot into one pack. That is
 ;; the best case for packing and it is not the deployed case: ADR-2608160100's
 ;; write-side policy is ONE COMMIT, ONE PACK, so a query over a database with a
 ;; history touches as many packs as it touches commits.
@@ -24,7 +24,7 @@
 ;; whether it holds.
 ;;
 ;; Run:
-;;   nbb --classpath "$(cat bin/classpath.txt)" bench/many_packs.cljs
+;;   nbb --classpath "$(cat bin/classpath.txt)" bench/many_packs.cljk
 
 (ns many-packs
   (:require [arrangement.core :as arr]

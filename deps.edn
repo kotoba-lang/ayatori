@@ -10,8 +10,8 @@
  ;; ADR-2607172300's dependency
  ;; table) is NOT a direct dep: it is retired upstream, merged into
  ;; `arrangement` as `arrangement.query`/`arrangement.datalog` -- see the
- ;; ns docstrings in `src/ayatori/query.cljc` and
- ;; `src/ayatori/discovery.cljc`.
+ ;; ns docstrings in `src/ayatori/query.cljk` and
+ ;; `src/ayatori/discovery.cljk`.
  ;;
  ;; `ayatori.remote` directly uses io-ipld for verification and
  ;; io-multiformats for advertised gateway addresses. `ayatori.pack` uses
@@ -20,7 +20,7 @@
  ;; `:payload-offset` convention drifts. `arrangement` pulls in
  ;; prolly-tree/datom-source/datalog; tools.deps resolves the remaining chain
  ;; from the pinned direct deps below for the JVM :test alias. The nbb primary test path
- ;; has no dependency resolver, so `bin/run_tests.cljs` / CI clone each of
+ ;; has no dependency resolver, so `bin/run_tests.cljk` / CI clone each of
  ;; those transitive deps into their own `.deps/<name>` and list every
  ;; src dir on --classpath by hand -- see the README's Develop/test section
  ;; for the exact command.
@@ -62,7 +62,7 @@
         {:git/url "https://github.com/kotoba-lang/envelope.git"
          :git/sha "16d65d5d96e6ff25d83a70e663f25a0f7d2970eb"}}
  ;; First-class runtime is nbb/cljs (repo-wide runtime priority):
- ;; the exact classpath lives in bin/run_tests.cljs, which is the runner.
+ ;; the exact classpath lives in bin/run_tests.cljk, which is the runner.
  ;; The :test alias below is the :clj COMPAT suite only -- not the
  ;; primary execution path.
  :aliases
