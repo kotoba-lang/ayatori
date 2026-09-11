@@ -211,4 +211,10 @@
  {:iteration 28 :date "2026-09-11" :benchmark :ldbc-snb-interactive-network-v2
   :throughput-ops-s nil :verdict :measured-no-row
   :interning-experiment {:as-is-mb 588 :interned-mb 634 :distinct-strings 828349 :quads 1788143}
-  :note "S19 first probe: canonicalising every :s/:o string through one table saves nothing (the table costs 46 MB more than the duplicates it removes). Strings are not the lever; the per-quad node paths in the three persistent index maps are. Next is a representation experiment inside datalog.index, which is an engine decision"}]
+  :note "S19 first probe: canonicalising every :s/:o string through one table saves nothing (the table costs 46 MB more than the duplicates it removes). Strings are not the lever; the per-quad node paths in the three persistent index maps are. Next is a representation experiment inside datalog.index, which is an engine decision"}
+ {:iteration 29 :date "2026-09-11" :benchmark :ldbc-snb-interactive-network-v2
+  :throughput-ops-s nil :verdict :measured-no-row
+  :index-nodes-35k-subset {:eavt {:sets 1652749 :singletons 1643941 :share 0.995} :aevt {:sets 1652749 :singletons 1643941 :share 0.995} :avet {:sets 438655 :singletons 193999 :share 0.442}}
+  :singleton-set-cost-bytes {:entry-with-set 211 :entry-direct 51 :overhead 160}
+  :prize {:subset-mb 557 :of-mb 830 :full-sf1-gb 6.4 :of-gb 10.9}
+  :note "S19': 99.5% of the (entity, attribute) and (attribute, entity) counterpart sets hold one value; a singleton PersistentHashSet costs 160 B over holding the value directly. Holding singletons directly would take full SF1 from 10.9 to ~4.5 GB -- resident on the 16 GiB fleet host. Proposed as root ADR-2609121100 (engine representation, owner decision)"}]
