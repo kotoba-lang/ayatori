@@ -217,4 +217,22 @@
   :index-nodes-35k-subset {:eavt {:sets 1652749 :singletons 1643941 :share 0.995} :aevt {:sets 1652749 :singletons 1643941 :share 0.995} :avet {:sets 438655 :singletons 193999 :share 0.442}}
   :singleton-set-cost-bytes {:entry-with-set 211 :entry-direct 51 :overhead 160}
   :prize {:subset-mb 557 :of-mb 830 :full-sf1-gb 6.4 :of-gb 10.9}
-  :note "S19': 99.5% of the (entity, attribute) and (attribute, entity) counterpart sets hold one value; a singleton PersistentHashSet costs 160 B over holding the value directly. Holding singletons directly would take full SF1 from 10.9 to ~4.5 GB -- resident on the 16 GiB fleet host. Proposed as root ADR-2609121100 (engine representation, owner decision)"}]
+  :note "S19': 99.5% of the (entity, attribute) and (attribute, entity) counterpart sets hold one value; a singleton PersistentHashSet costs 160 B over holding the value directly. Holding singletons directly would take full SF1 from 10.9 to ~4.5 GB -- resident on the 16 GiB fleet host. Proposed as root ADR-2609121100 (engine representation, owner decision)"}
+ {:iteration 30 :date "2026-09-11" :benchmark :ldbc-snb-interactive-network-v2
+  :rung :sf1-subset-35k-posts+profiles+knows-dates+forums :origin :cross-host :path :lan :sut "levi" :driver "judah, rtt 0.55 ms"
+  :mix [:ic02 :ic07 :ic08 :ic09 :is1 :is2 :is3 :is4 :is5 :is6 :is7 :ins2 :ins8] :inflight 8 :sut-threads 8 :impl :datalog
+  :rate 2048 :throughput-ops-s 1960.4 :on-time-pct 100.0 :failed 0
+  :next-rate-failed {:rate 2560 :on-time-pct 47.41}
+  :p50-ms {:ic02 3.8 :ic07 3.1 :ic08 2.2 :ic09 7.4 :is1 2.2 :is2 3.6 :is3 7.8 :is4 2.1 :is5 2.1 :is6 2.1 :is7 2.0 :ins2 1.9 :ins8 1.9}
+  :read-after-write {:checked 43 :not-visible 0 :unverifiable 77}
+  :target-ops-s 139411.14 :ratio-to-target 71 :verdict :baseline
+  :receipt "kotobase-peer bench/results/2026-09-11-ldbc-snb-network-iteration-30-inserts.edn"
+  :note "first row with writes (M2: 2 of 8 inserts served, single-writer atom, snapshot reads). New SUT host (levi; simeon lost residency to an 8 GB fleet process) so a new column; level with the 11-op read-only mix on simeon. Unverifiable inserts are ones whose dependencies (INS1 persons, posts outside the subset) this SUT does not hold"}
+ {:iteration 30 :date "2026-09-11" :benchmark :ldbc-snb-interactive-network-v2
+  :rung :sf1-subset-35k-posts+profiles+knows-dates+forums :origin :cross-host :path :lan :sut "levi" :driver "judah"
+  :mix [:ic02 :ic07 :ic08 :ic09 :is1 :is2 :is3 :is4 :is5 :is6 :is7 :ins2 :ins8] :inflight 32 :sut-threads 8 :impl :datalog
+  :rate 4096 :throughput-ops-s 3790.8 :on-time-pct 95.50 :failed 0
+  :p50-ms {:ic02 5.3 :ic07 4.2 :ic08 3.5 :ic09 9.6 :is1 3.6 :is2 5.7 :is3 10.0 :is4 3.6 :is5 3.6 :is6 3.7 :is7 3.7 :ins2 3.5 :ins8 3.5}
+  :read-after-write {:checked 29 :not-visible 0 :unverifiable 91}
+  :target-ops-s 139411.14 :ratio-to-target 37 :verdict :baseline
+  :note "32-slot column with writes; 95.50% on-time is a boundary pass"}]
