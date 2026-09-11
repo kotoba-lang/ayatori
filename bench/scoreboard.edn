@@ -186,4 +186,11 @@
   :next-rate-failed {:rate 4608 :on-time-pct 53.32 :throughput-at-failure 4242.6}
   :p50-ms {:ic02 7.1 :ic07 5.8 :ic08 5.5 :ic09 11.2 :is1 5.6 :is2 7.3 :is3 11.9 :is4 5.6 :is5 5.5 :is6 5.4 :is7 5.4}
   :target-ops-s 139411.14 :ratio-to-target 34 :verdict :trade
-  :note "32-slot column 5118 -> 4089 with the wider mix; SUT ceiling on this mix ~4,250 delivered"}]
+  :note "32-slot column 5118 -> 4089 with the wider mix; SUT ceiling on this mix ~4,250 delivered"}
+ {:iteration 25 :date "2026-09-11" :benchmark :ldbc-snb-interactive-network-v2
+  :rung :sf1-proper :quads 20569957 :origin :cross-host :path :lan
+  :throughput-ops-s nil :verdict :rung-loaded-gate-found-a-defect
+  :sut {:host "simeon" :heap-used-mb 11594 :heap-max-mb 11848 :rss-mb 9054 :load-ms 13848 :build-ms 92287}
+  :answers-agree {:checked 1082 :disagreements 1 :which {:op :ic09 :person "17592186047707"} :fixed "kotobase-peer 1b9e0a43 (exclusion inside the query) on datalog f059e215 (drive admits predicates); parameter re-checked on full SF1: equal both ways"}
+  :receipt "kotobase-peer bench/results/2026-09-11-ldbc-snb-rung-full-sf1-load-and-gate.edn"
+  :note "the first rung above the subset: full SF1 fits the fleet host once the build is batched (one transact OOMed at 13 GB). The startup gate disabled the index path on one IC09 disagreement -- a real defect from iteration 18 (limit taken before the start-person exclusion) the empty-answer subset could not exercise. No throughput row until the gate passes on the fixed SUT"}]
