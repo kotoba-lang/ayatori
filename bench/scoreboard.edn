@@ -335,4 +335,14 @@
   :read-after-write {:checked 600 :not-visible 0 :outside-window 0 :unverifiable 0 :is6-checked 100 :no-covering-read 100}
   :target-ops-s 139411.14 :ratio-to-target 40 :verdict :growth
   :receipt "kotobase-peer bench/results/2026-09-11-ldbc-snb-network-iteration-36-top-k-in-the-query.edn"
-  :note "32-slot ceiling 512 -> 2048 (2560 fails, 51.5%); the full SF1 column now within 1.3x of the subset column at 32 slots"}]
+  :note "32-slot ceiling 512 -> 2048 (2560 fails, 51.5%); the full SF1 column now within 1.3x of the subset column at 32 slots"}
+ {:iteration 37 :date "2026-09-12" :benchmark :ldbc-snb-interactive-network-v2
+  :rung :sf1-full :origin :cross-host :path :lan :sut "levi" :driver "judah" :sut-heap "-Xmx10g" :quads 20569957
+  :mix [:ic02 :ic07 :ic08 :ic09 :is1 :is2 :is3 :is4 :is5 :is6 :is7 :stream] :stream {:tcr 0.00015 :types [:ins1 :ins2 :ins3 :ins4 :ins5 :ins6 :ins7 :ins8] :skipped-types []}
+  :inflight 64 :sut-threads 16 :impl :datalog :engine "datalog dc7100c2; kotobase-peer a16d91c3"
+  :rate 2560 :updates-per-s 1475 :throughput-ops-s 3852.3 :on-time-pct 100.0 :failed 0
+  :sut-memory {:heap-used-mb 5075 :heap-max-mb 10240 :rss-mb 10570 :swap-used-pct 21.3} :sut-load-avg ["13.05" "6.79" "4.60"]
+  :read-after-write {:checked 240 :not-visible 0 :outside-window 0 :unverifiable 0 :is6-checked 40 :no-covering-read 40}
+  :target-ops-s 139411.14 :ratio-to-target 36 :verdict :growth-by-column
+  :receipt "kotobase-peer bench/results/2026-09-12-ldbc-snb-network-iteration-37.edn"
+  :note "first 64-slot row (3072 fails, 48.3%); 8- and 32-slot columns unchanged (1024 / 2048); ZGC refuted (32 slots at 2048 fell to 66% on-time); IC09 in process 10.8 -> 8.7 ms with a PriorityQueue heap; load 13 on 10 cores -- the SUT is CPU-bound on this host (M4)"}]
