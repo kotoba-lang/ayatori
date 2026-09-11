@@ -193,4 +193,12 @@
   :sut {:host "simeon" :heap-used-mb 11594 :heap-max-mb 11848 :rss-mb 9054 :load-ms 13848 :build-ms 92287}
   :answers-agree {:checked 1082 :disagreements 1 :which {:op :ic09 :person "17592186047707"} :fixed "kotobase-peer 1b9e0a43 (exclusion inside the query) on datalog f059e215 (drive admits predicates); parameter re-checked on full SF1: equal both ways"}
   :receipt "kotobase-peer bench/results/2026-09-11-ldbc-snb-rung-full-sf1-load-and-gate.edn"
-  :note "the first rung above the subset: full SF1 fits the fleet host once the build is batched (one transact OOMed at 13 GB). The startup gate disabled the index path on one IC09 disagreement -- a real defect from iteration 18 (limit taken before the start-person exclusion) the empty-answer subset could not exercise. No throughput row until the gate passes on the fixed SUT"}]
+  :note "the first rung above the subset: full SF1 fits the fleet host once the build is batched (one transact OOMed at 13 GB). The startup gate disabled the index path on one IC09 disagreement -- a real defect from iteration 18 (limit taken before the start-person exclusion) the empty-answer subset could not exercise. No throughput row until the gate passes on the fixed SUT"}
+ {:iteration 26 :date "2026-09-11" :benchmark :ldbc-snb-interactive-network-v2
+  :rung :sf1-proper :quads 20569957 :origin :cross-host :path :lan :mix [:ic02 :ic07 :ic08 :ic09 :is1 :is2 :is3 :is4 :is5 :is6 :is7]
+  :throughput-ops-s nil :verdict :refused-host-memory
+  :answers-agree {:checked 1082 :disagreements 0 :note "the IC09 fix from iteration 25 holds on the rung that found it"}
+  :host-memory {:sut {:heap-used-mb 10954 :rss-mb 8476 :swap-used-pct 80.7 :page-ins 3804131}}
+  :probe-p50-ms-at-rate-64 {:ic02 111.0 :ic09 86.1 :is2 25.1 :ic08 4.0}
+  :receipt "kotobase-peer bench/results/2026-09-11-ldbc-snb-network-iteration-26-full-sf1-refused.edn"
+  :note "full SF1 loads, builds and passes the gate on the 16 GiB host and cannot be served resident: ~530 B per quad on this shape (the 2M-quad subset measured 337). The residency rule that let a 0.77 rss/heap SUT pass is 0.95 now (control: this SUT refused). M3's wall named: a host with ~24 GB free for this heap shape, or a smaller footprint"}]
