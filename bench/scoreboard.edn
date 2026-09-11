@@ -355,4 +355,13 @@
   :read-after-write {:checked 360 :not-visible 0 :outside-window 0 :unverifiable 0 :is6-checked 60 :no-covering-read 60}
   :target-ops-s 139411.14 :ratio-to-target 33 :verdict :growth
   :receipt "kotobase-peer bench/results/2026-09-12-ldbc-snb-network-iteration-38.edn"
-  :note "64-slot column 3852 -> 4233 (3072 fails 85.9%). The HTTP layer is not the wall: a no-op op serves 16,065/s over the same route. jstat showed G1 marking continuously below the 5 GB live set (adaptive IHOP); marking now starts at 75%"}]
+  :note "64-slot column 3852 -> 4233 (3072 fails 85.9%). The HTTP layer is not the wall: a no-op op serves 16,065/s over the same route. jstat showed G1 marking continuously below the 5 GB live set (adaptive IHOP); marking now starts at 75%"}
+ {:iteration 39 :date "2026-09-12" :benchmark :ldbc-snb-interactive-network-v2
+  :rung :sf1-full :origin :cross-host :path :lan :sut "levi" :driver "judah" :sut-heap "-Xmx10g -XX:-G1UseAdaptiveIHOP -XX:InitiatingHeapOccupancyPercent=75" :quads 20569957
+  :mix [:ic02 :ic07 :ic08 :ic09 :is1 :is2 :is3 :is4 :is5 :is6 :is7 :stream] :stream {:tcr 0.00015 :types [:ins1 :ins2 :ins3 :ins4 :ins5 :ins6 :ins7 :ins8] :skipped-types []}
+  :inflight 64 :sut-threads 16 :impl :datalog :engine "datalog 4921e8b7 (grouped or global walk by expected steps); kotobase-peer e4d388ff"
+  :rate 2944 :updates-per-s 1475 :throughput-ops-s 4374.1 :on-time-pct 100.0 :failed 0
+  :read-after-write {:checked 240 :not-visible 0 :outside-window 0 :unverifiable 0 :is6-checked 39 :no-covering-read 40}
+  :target-ops-s 139411.14 :ratio-to-target 32 :verdict :growth
+  :receipt "kotobase-peer bench/results/2026-09-12-ldbc-snb-network-iteration-39.edn"
+  :note "same passing read rate as it.38, +3% (3328 fails 73.4%); IC09 in process 8.7 -> 4.9 ms, wire p50 at 64 slots 30.7 -> 20.0. A count-only walk rule sent IC07 to the plain join (81 ms p50, sweep 35% on-time) and was refuted the same hour; the entry-ratio rule replaced it"}]
