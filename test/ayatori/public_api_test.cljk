@@ -2,7 +2,7 @@
   (:require [ayatori.agent :as agent]
             [ayatori.discovery :as discovery]
             [ayatori.query :as query]
-            [clojure.test :refer [deftest is testing]]
+            [kotoba.test :refer [deftest is testing]]
             [kotobase.local :as local]
             [kotobase.store :as st]))
 

@@ -1,7 +1,7 @@
 (ns ayatori.remote-test
   (:require [arrangement.core :as arr]
             [ayatori.remote :as remote]
-            [clojure.test :refer [deftest is testing]]
+            [kotoba.test :refer [deftest is testing]]
             #?(:cljs [cljs.test :refer [async]])
             [ipld.core :as ipld]
             [multiformats.core :as mf]))

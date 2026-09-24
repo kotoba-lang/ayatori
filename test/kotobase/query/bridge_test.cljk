@@ -1,5 +1,5 @@
 (ns kotobase.query.bridge-test
-  (:require [clojure.test :refer [deftest is testing]]
+  (:require [kotoba.test :refer [deftest is testing]]
             [arrangement.core :as arr]
             [kotobase.local :as local]
             [kotobase.store :as st]

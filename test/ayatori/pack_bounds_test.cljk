@@ -1,5 +1,5 @@
 (ns ayatori.pack-bounds-test
-  (:require [clojure.test :refer [deftest is]]
+  (:require [kotoba.test :refer [deftest is]]
             [ayatori.pack :as pack]
             [ipld.car :as car]
             [ipld.car.bytes :as b]
