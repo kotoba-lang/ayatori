@@ -4,7 +4,7 @@
   serving a pack without discovery, and the corrupt-source fall-through."
   (:require [arrangement.core :as arr]
             [ayatori.remote :as remote]
-            [clojure.test :as t :refer [deftest is]]
+            [kotoba.test :as t :refer [deftest is]]
             [ipld.core :as ipld]
             ;; `async` is a cljs.test macro; `clojure.test` has no such var, so
             ;; referring it unconditionally makes this namespace fail to LOAD on

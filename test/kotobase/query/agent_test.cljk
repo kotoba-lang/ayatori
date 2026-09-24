@@ -4,7 +4,7 @@
   on 2026-08-18 an earlier copy rejected eighteen correct queries by treating
   value strings as attributes, and the fix for that walked zero clauses and
   passed everything."
-  (:require [clojure.test :refer [deftest is testing]]
+  (:require [kotoba.test :refer [deftest is testing]]
             [kotobase.query.agent :as agent]))
 
 (def schema

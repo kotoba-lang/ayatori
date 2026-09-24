@@ -16,7 +16,7 @@
   what `validate` approves -- is not rejected by this engine. `(:find <vector>)`
   is nil, so it runs an empty query and answers with one empty tuple, which no
   caller can tell from a query that matched nothing."
-  (:require [clojure.test :refer [deftest is testing]]
+  (:require [kotoba.test :refer [deftest is testing]]
             [arrangement.core :as arr]
             [arrangement.datalog :as datalog]
             [kotobase.query.agent :as agent]

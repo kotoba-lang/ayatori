@@ -7,7 +7,7 @@
   requests."
   (:require [ayatori.pack :as pack]
             [ayatori.remote :as remote]
-            [clojure.test :refer [deftest is testing]]
+            [kotoba.test :refer [deftest is testing]]
             [ipld.car.bytes :as b]
             [ipld.car.v2 :as car2]
             [ipld.core :as ipld]))

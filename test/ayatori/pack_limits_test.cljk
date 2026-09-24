@@ -11,7 +11,7 @@
   The characteristics bitfield was parsed and dropped. CARv2 gives an archive
   128 bits to say it is not an ordinary one; read and discarded, saying so and
   saying nothing produced the same read."
-  (:require [clojure.test :refer [deftest is testing]]
+  (:require [kotoba.test :refer [deftest is testing]]
             [ayatori.pack :as pack]
             [ipld.car.bytes :as b]
             [ipld.car.v2 :as car2]
