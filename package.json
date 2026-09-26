@@ -2,10 +2,9 @@
   "name": "ayatori",
   "private": true,
   "description": "Ayatori query plane for Kotobase -- materialization and query access over content-addressed graph data.",
-  "comment": "These are not new: the suite already resolved @noble/hashes through kotoba-lang/io-multiformats and only ran because a parent directory of the west checkout happened to have one. An undeclared dependency that resolves by accident is the shape of a green that cannot be reproduced elsewhere, so it is declared. @noble/curves is held at 1.x because kotoba-lang/org-signal's x25519 calls utils.randomPrivateKey, which 2.x renamed. @noble/post-quantum is exact and matches the version kotoba-lang/envelope pins its ML-KEM module digest to; a different one there is refused by envelope.qualify, and silently unqualified here.",
+  "comment": "@noble/hashes was declared here directly until 2026-09-25 (ADR-2608260200/2608301100 host-provider wave): the comment at the time said the suite 'already resolved @noble/hashes through kotoba-lang/io-multiformats'. Checked at ayatori's pinned io-multiformats sha (deps.edn 561fe7dfada3db852b127f06d41750dabd3cead9), that repo's src no longer imports @noble/hashes anywhere -- it moved to kotoba-lang/org-nist-sha2's sha2.core/sha2.sha512 (pure .cljc, no npm) before this pin was taken. Neither ayatori's own src/test, nor the pinned org-signal (511e4b47de5d17945aa02815725703e8eb52bdef) or envelope (16d65d5d96e6ff25d83a70e663f25a0f7d2970eb) src/test, `require` it either. The direct declaration was therefore dead: nothing on this classpath calls it. It is NOT gone from node_modules -- @noble/curves depends on @noble/hashes@1.8.0 and @noble/post-quantum nests its own @noble/hashes@2.0.1 for its internal SHA3/SHAKE (ML-KEM) needs, so removing this line only drops the top-level declaration, not the transitive install. @noble/curves is held at 1.x because kotoba-lang/org-signal's x25519 calls utils.randomPrivateKey, which 2.x renamed. @noble/post-quantum is exact and matches the version kotoba-lang/envelope pins its ML-KEM module digest to; a different one there is refused by envelope.qualify, and silently unqualified here.",
   "dependencies": {
     "@noble/curves": "^1.9.0",
-    "@noble/hashes": "^1.8.0",
     "@noble/post-quantum": "0.5.4"
   }
 }
