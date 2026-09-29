@@ -85,7 +85,7 @@ it.**
    datomic-client-shim, org-graphql-http, org-opencypher-cypher and
    org-w3-sparql-protocol -- the surfaces root ADR-2608039975 records as not
    live. Adoption inside `kotobase-server`'s `hot-datoms` is a real
-   integration, and root CLAUDE.md names the two-implementation problem
+   integration, and root AGENTS.md names the two-implementation problem
    explicitly as the thing not to re-open.
 3. **This bench uses identity crypto and an in-memory block map.** Production
    `decrypt-fn` is real AES-GCM and `blind-fn` real HMAC. The COUNT is the
